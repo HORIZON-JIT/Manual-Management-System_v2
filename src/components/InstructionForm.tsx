@@ -185,6 +185,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         'application/json',
       );
       const folderName = getTargetFolder()?.name || 'WorkInstructions';
+      // ローカルストレージのステータスも completed に更新（下書き残留を防止）
+      try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
       setSaveMessage({ text: `「${folderName}」にExcel・JSONを保存しました`, type: 'success' });
       setTimeout(() => router.push('/'), 1500);
     } catch (err) {
