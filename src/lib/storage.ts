@@ -18,11 +18,18 @@ export function getInstruction(id: string): WorkInstruction | undefined {
 }
 
 export function saveInstruction(instruction: WorkInstruction): void {
-  const all = getAllInstructions();
+  let all = getAllInstructions();
   const index = all.findIndex((inst) => inst.id === instruction.id);
   if (index >= 0) {
     all[index] = instruction;
   } else {
+    // 同タイトルの下書きが既にあれば上書き（量産防止）
+    if (instruction.status === 'draft' && instruction.title.trim()) {
+      all = all.filter(
+        (inst) =>
+          !(inst.status === 'draft' && inst.title.trim() === instruction.title.trim() && inst.id !== instruction.id)
+      );
+    }
     all.push(instruction);
   }
   try {
