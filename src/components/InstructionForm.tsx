@@ -58,6 +58,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     initialData?.updatedBy || initialData?.createdBy || getLastAuthorName()
   );
   const [updateNote, setUpdateNote] = useState('');
+  const [addHistory, setAddHistory] = useState(false);
   const [keywordsText, setKeywordsText] = useState(
     initialData?.keywords?.join(', ') || ''
   );
@@ -117,7 +118,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     const now = new Date().toISOString();
 
     let updateHistory: UpdateHistoryEntry[] = initialData?.updateHistory || [];
-    if (isEdit && trimmedName) {
+    if (isEdit && trimmedName && addHistory) {
       const entry: UpdateHistoryEntry = {
         updatedBy: trimmedName,
         updatedAt: now,
@@ -323,17 +324,26 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         </div>
 
         {isEdit && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              更新メモ <span className="text-gray-400 font-normal">(任意)</span>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={addHistory}
+                onChange={(e) => setAddHistory(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">改版履歴に記録する</span>
+              <span className="text-xs text-gray-400">（大きな変更があった場合にチェック）</span>
             </label>
-            <input
-              type="text"
-              value={updateNote}
-              onChange={(e) => setUpdateNote(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="例: ステップ3の画像を更新"
-            />
+            {addHistory && (
+              <input
+                type="text"
+                value={updateNote}
+                onChange={(e) => setUpdateNote(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="例: ステップ3の手順を大幅変更"
+              />
+            )}
           </div>
         )}
 
