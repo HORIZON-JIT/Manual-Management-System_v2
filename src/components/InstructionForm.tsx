@@ -152,7 +152,9 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const handleDraftSave = () => {
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+
+  const handleDraftSave = (continueEditing: boolean) => {
     const instruction = buildInstruction('draft');
     if (!instruction) return;
 
@@ -162,7 +164,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       alert(e instanceof Error ? e.message : '保存に失敗しました。');
       return;
     }
-    router.push('/instructions/drafts');
+    if (continueEditing) {
+      setDraftSaveMessage('下書きを保存しました');
+      setTimeout(() => setDraftSaveMessage(null), 3000);
+    } else {
+      router.push('/instructions/drafts');
+    }
   };
 
   const saveToFolder = async (instruction: WorkInstruction) => {
@@ -383,14 +390,25 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
       {/* Actions */}
       <div className="space-y-3 pt-4">
+        {draftSaveMessage && (
+          <p className="text-sm text-center text-emerald-600 font-medium">{draftSaveMessage}</p>
+        )}
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            onClick={handleDraftSave}
+            onClick={() => handleDraftSave(true)}
             disabled={saving}
-            className="flex-1 py-3.5 bg-amber-50 border-2 border-amber-300 text-amber-700 rounded-xl font-bold text-lg hover:bg-amber-100 transition disabled:opacity-50"
+            className="flex-1 py-3.5 bg-white border-2 border-slate-300 text-slate-600 rounded-xl font-bold text-base hover:bg-slate-50 transition disabled:opacity-50"
           >
-            下書き保存
+            下書き保存（継続）
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDraftSave(false)}
+            disabled={saving}
+            className="flex-1 py-3.5 bg-amber-50 border-2 border-amber-300 text-amber-700 rounded-xl font-bold text-base hover:bg-amber-100 transition disabled:opacity-50"
+          >
+            下書き保存して終了
           </button>
           <button
             type="submit"
