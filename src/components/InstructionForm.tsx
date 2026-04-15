@@ -173,6 +173,19 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     }
   };
 
+  const handleJsonExport = () => {
+    const instruction = buildInstruction('draft');
+    if (!instruction) return;
+    const json = JSON.stringify(instruction, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${instruction.title || '手順書'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const saveToFolder = async (instruction: WorkInstruction) => {
     setSaving(true);
     setSaveMessage(null);
@@ -428,6 +441,13 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             {saving ? '保存中...' : '完成'}
           </button>
         </div>
+        <button
+          type="button"
+          onClick={handleJsonExport}
+          className="w-full py-2.5 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+        >
+          JSONで保存（ストレージ容量不足時の代替保存）
+        </button>
         <button
           type="button"
           onClick={() => router.back()}

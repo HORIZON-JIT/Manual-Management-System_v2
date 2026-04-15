@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { getAllInstructions, deleteInstruction } from '@/lib/storage';
+import { setTempData } from '@/lib/tempStorage';
 
 export default function DraftsPage() {
+  const router = useRouter();
   const [drafts, setDrafts] = useState<WorkInstruction[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const all = getAllInstructions();
@@ -29,8 +33,37 @@ export default function DraftsPage() {
     setDrafts([]);
   };
 
+  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const json = JSON.parse(ev.target?.result as string) as WorkInstruction;
+        if (!json.id || !json.title || !Array.isArray(json.steps)) {
+          alert('有効な手順書JSONファイルではありません。');
+          return;
+        }
+        await setTempData('drive_import_instruction', json);
+        router.push('/instructions/edit?source=drive');
+      } catch {
+        alert('JSONファイルの読み込みに失敗しました。ファイルが壊れている可能性があります。');
+      }
+    };
+    reader.readAsText(file);
+    // reset so same file can be re-selected
+    e.target.value = '';
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleJsonFileChange}
+      />
       <div className="flex items-center gap-3 mb-8">
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 transition">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,10 +73,16 @@ export default function DraftsPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-800">途中から編集</h1>
         <span className="text-sm text-slate-400 ml-1">{drafts.length} 件</span>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="ml-auto text-xs px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+        >
+          JSONから読み込む
+        </button>
         {drafts.length >= 2 && (
           <button
             onClick={handleDeleteAll}
-            className="ml-auto text-xs px-3 py-1.5 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition"
+            className="text-xs px-3 py-1.5 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition"
           >
             すべて削除
           </button>
