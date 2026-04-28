@@ -159,12 +159,14 @@ const solidFill = (color: string): ExcelJS.Fill => ({
 // Single instruction export
 // ============================================================
 
-export async function exportToExcel(instruction: WorkInstruction): Promise<void> {
-  const buffer = await buildExcelBuffer(instruction);
+export type ExcelNavMode = 'scroll' | 'jump';
+
+export async function exportToExcel(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<void> {
+  const buffer = await buildExcelBuffer(instruction, navMode);
   downloadBuffer(buffer, `${instruction.title}_手順書.xlsx`);
 }
 
-export async function buildExcelBuffer(instruction: WorkInstruction): Promise<ArrayBuffer> {
+export async function buildExcelBuffer(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('作業手順書', {
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
@@ -261,10 +263,13 @@ export async function buildExcelBuffer(instruction: WorkInstruction): Promise<Ar
 
   // ===== STEPS =====
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const stepStartRows: number[] = [];
+  const titleEndCol = navMode === 'jump' ? LAST_COL - 1 : LAST_COL;
 
   for (let i = 0; i < sortedSteps.length; i++) {
     const step = sortedSteps[i];
     const stepNum = String(i + 1).padStart(2, '0');
+    stepStartRows.push(row);
 
     // --- Step header row ---
     ws.getRow(row).height = 34;
@@ -282,8 +287,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction): Promise<Ar
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-    // C-N: step title
-    mergeStyled(ws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
+    // C-M or C-N: step title (narrower when jump mode to leave room for nav link)
+    mergeStyled(ws, row, CONTENT_START_COL, row, titleEndCol, `  ${step.title}`, {
       font: { bold: true, size: 13, color: { argb: C.stepTitle } },
       fill: solidFill(C.headerBg),
       alignment: { horizontal: 'left' },
@@ -482,6 +487,27 @@ export async function buildExcelBuffer(instruction: WorkInstruction): Promise<Ar
     if (i < sortedSteps.length - 1) {
       ws.getRow(row).height = 10;
       row++;
+    }
+  }
+
+  // ===== NAV LINKS (jump mode only) =====
+  if (navMode === 'jump') {
+    for (let i = 0; i < stepStartRows.length; i++) {
+      const navCell = ws.getCell(stepStartRows[i], LAST_COL);
+      const isLast = i === stepStartRows.length - 1;
+      navCell.value = {
+        text: isLast ? '↑ 先頭' : '次へ →',
+        hyperlink: isLast ? `#A1` : `#A${stepStartRows[i + 1]}`,
+      } as ExcelJS.CellHyperlinkValue;
+      navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
+      navCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      navCell.fill = solidFill(C.headerBg);
+      setBoxBorder(navCell, {
+        top: { style: 'thin', color: { argb: C.borderBlue } },
+        bottom: { style: 'medium', color: { argb: C.borderBlue } },
+        left: NO_BORDER,
+        right: { style: 'thin', color: { argb: C.borderBlue } },
+      });
     }
   }
 
