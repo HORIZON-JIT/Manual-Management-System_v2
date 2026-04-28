@@ -491,14 +491,15 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   // ===== NAV LINKS (jump mode only) =====
+  // Use HYPERLINK formula with Google Sheets internal link format (#gid=0&range=)
+  // so navigation works when the file is viewed in Google Sheets
   if (navMode === 'jump') {
     for (let i = 0; i < stepStartRows.length; i++) {
       const navCell = ws.getCell(stepStartRows[i], LAST_COL);
       const isLast = i === stepStartRows.length - 1;
-      navCell.value = {
-        text: isLast ? '↑ 先頭' : '次へ →',
-        hyperlink: isLast ? `#A1` : `#A${stepStartRows[i + 1]}`,
-      } as ExcelJS.CellHyperlinkValue;
+      const target = isLast ? `#gid=0&range=A1` : `#gid=0&range=A${stepStartRows[i + 1]}`;
+      const label = isLast ? '↑ 先頭' : '次へ →';
+      navCell.value = { formula: `=HYPERLINK("${target}","${label}")` };
       navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
       navCell.alignment = { horizontal: 'center', vertical: 'middle' };
       navCell.fill = solidFill(C.headerBg);
