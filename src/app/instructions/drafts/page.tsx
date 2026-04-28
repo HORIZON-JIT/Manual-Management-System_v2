@@ -98,12 +98,20 @@ export default function DraftsPage() {
           </div>
           <p className="text-slate-500 text-lg mb-2">下書きがありません</p>
           <p className="text-slate-400 text-sm mb-6">新規作成で手順書を作り始めましょう</p>
-          <Link
-            href="/instructions/new"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition shadow-md"
-          >
-            新規作成
-          </Link>
+          <div className="flex flex-col items-center gap-3">
+            <Link
+              href="/instructions/new"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition shadow-md"
+            >
+              新規作成
+            </Link>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-sm px-5 py-2.5 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition"
+            >
+              JSONから読み込む
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
