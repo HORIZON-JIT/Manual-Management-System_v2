@@ -44,7 +44,7 @@ export default function DraftsPage() {
           alert('有効な手順書JSONファイルではありません。');
           return;
         }
-        await setTempData('drive_import_instruction', json);
+        await setTempData('drive_import_instruction', JSON.stringify(json));
         router.push('/instructions/edit?source=drive');
       } catch {
         alert('JSONファイルの読み込みに失敗しました。ファイルが壊れている可能性があります。');
