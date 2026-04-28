@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
-import { buildExcelBuffer } from '@/lib/exportSpreadsheet';
+import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -62,6 +62,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [keywordsText, setKeywordsText] = useState(
     initialData?.keywords?.join(', ') || ''
   );
+  const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('scroll');
 
   const handleAddStep = () => {
     setSteps([...steps, createEmptyStep(steps.length)]);
@@ -191,7 +192,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     setSaveMessage(null);
     try {
       // Upload Excel
-      const excelBuffer = await buildExcelBuffer(instruction);
+      const excelBuffer = await buildExcelBuffer(instruction, excelNavMode);
       await saveFileToDrive(
         excelBuffer,
         `${instruction.title}_手順書.xlsx`,
@@ -413,6 +414,32 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
       {/* Actions */}
       <div className="space-y-3 pt-4">
+        {/* Excel nav mode selector */}
+        <div className="flex items-center gap-4 px-1">
+          <span className="text-sm font-medium text-slate-600">Excel閲覧モード:</span>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="excelNavMode"
+              value="scroll"
+              checked={excelNavMode === 'scroll'}
+              onChange={() => setExcelNavMode('scroll')}
+              className="accent-blue-600"
+            />
+            <span className="text-sm text-slate-600">スクロール</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="excelNavMode"
+              value="jump"
+              checked={excelNavMode === 'jump'}
+              onChange={() => setExcelNavMode('jump')}
+              className="accent-blue-600"
+            />
+            <span className="text-sm text-slate-600">リンクジャンプ</span>
+          </label>
+        </div>
         {draftSaveMessage && (
           <p className="text-sm text-center text-emerald-600 font-medium">{draftSaveMessage}</p>
         )}
