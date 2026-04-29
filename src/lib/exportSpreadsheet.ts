@@ -491,14 +491,30 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   // ===== NAV LINKS (jump mode only) =====
+  // Strategy: define a named range for each step anchor, then use
+  // HYPERLINK("#RangeName","text") — the only format that reliably
+  // navigates within Google Sheets when imported from XLSX.
   if (navMode === 'jump') {
+    // 1. Define named ranges for each step start row
+    const sheetRef = '作業手順書';
+    for (let i = 0; i < stepStartRows.length; i++) {
+      // Named range "Step_1", "Step_2", ... pointing to col A of that row
+      wb.definedNames.add(
+        `'${sheetRef}'!$A$${stepStartRows[i]}`,
+        `Step_${i + 1}`,
+      );
+    }
+    // Named range for the top (row 1)
+    wb.definedNames.add(`'${sheetRef}'!$A$1`, 'Step_Top');
+
+    // 2. Set nav cells using #RangeName hyperlinks
     for (let i = 0; i < stepStartRows.length; i++) {
       const navCell = ws.getCell(stepStartRows[i], LAST_COL);
       const isLast = i === stepStartRows.length - 1;
-      const targetRow = isLast ? 1 : stepStartRows[i + 1];
+      const targetName = isLast ? 'Step_Top' : `Step_${i + 2}`;
       const label = isLast ? '↑ 先頭' : '次へ →';
       navCell.value = {
-        formula: `HYPERLINK("#gid=0&range=A${targetRow}","${label}")`,
+        formula: `HYPERLINK("#${targetName}","${label}")`,
         result: label,
       };
       navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
