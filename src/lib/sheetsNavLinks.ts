@@ -16,45 +16,47 @@ function stepTabName(index: number, title: string): string {
   return `${stepNum} ${title}`.replace(/[\\/*?[\]:]/g, '').substring(0, 31);
 }
 
-// Nav footer spans col B (1, 0-based) to N (13, 0-based); value is in col B
-const NAV_START_COL = 1;  // column B (0-based)
-const NAV_END_COL = 14;   // exclusive
-
 const BLUE_BG = { red: 0.145, green: 0.388, blue: 0.922 };
+const BTN_BG = { red: 0.231, green: 0.510, blue: 0.965 };  // primaryLight
 const WHITE = { red: 1.0, green: 1.0, blue: 1.0 };
 
-function navRequest(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function linkCellRequest(
   sheetId: number,
-  navRowIndex: number,  // 0-based row index of the nav footer row
+  rowIndex: number,
+  colIndex: number,
   label: string,
   targetUri: string,
+  bg: { red: number; green: number; blue: number },
+  fg: { red: number; green: number; blue: number },
+  fontSize: number,
 ) {
   return {
     updateCells: {
       range: {
         sheetId,
-        startRowIndex: navRowIndex,
-        endRowIndex: navRowIndex + 1,
-        startColumnIndex: NAV_START_COL,
-        endColumnIndex: NAV_START_COL + 1,  // only update the first cell of the merge
+        startRowIndex: rowIndex,
+        endRowIndex: rowIndex + 1,
+        startColumnIndex: colIndex,
+        endColumnIndex: colIndex + 1,
       },
       rows: [{
         values: [{
           userEnteredValue: { stringValue: label },
           userEnteredFormat: {
-            backgroundColor: BLUE_BG,
+            backgroundColor: bg,
             horizontalAlignment: 'CENTER',
             verticalAlignment: 'MIDDLE',
             textFormat: {
-              foregroundColor: WHITE,
+              foregroundColor: fg,
               bold: true,
-              fontSize: 13,
+              fontSize,
             },
           },
           textFormatRuns: [{
             startIndex: 0,
             format: {
-              foregroundColor: WHITE,
+              foregroundColor: fg,
               link: { uri: targetUri },
             },
           }],
@@ -67,13 +69,15 @@ function navRequest(
 
 /**
  * After uploading an XLSX (converted to Google Sheets format), add proper
- * internal navigation links to the nav footer row at the bottom of each step sheet.
- * stepNavRows[i] is the 0-based row index of the nav footer in step sheet i.
+ * internal navigation links:
+ * 1. Nav footer at the bottom of each step sheet ("次へ →" / "↑ 概要へ戻る")
+ * 2. Index "→ 開く" buttons on the main sheet's table of contents
  */
 export async function addStepNavLinks(
   spreadsheetId: string,
   instruction: WorkInstruction,
   stepNavRows: number[],
+  indexNavRows: number[],
 ): Promise<void> {
   const token = gapi.client.getToken()?.access_token;
   if (!token) throw new Error('Google認証が必要です');
@@ -105,14 +109,32 @@ export async function addStepNavLinks(
   const mainSheet = sheetList.find((s) => s.index === 0);
   const mainGid = mainSheet ? mainSheet.sheetId : 0;
 
-  // 2. Build batchUpdate requests using stepNavRows for exact row positions
-  const requests = stepGids.map((gid, i) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requests: any[] = [];
+
+  // 2a. Step sheet footer nav links ("次へ →" / "↑ 概要へ戻る")
+  // Nav footer cell is in column B (index 1) — the first cell of the B-N merge
+  stepGids.forEach((gid, i) => {
     const isLast = i === stepGids.length - 1;
     const label = isLast ? '↑ 概要へ戻る' : '次へ →';
     const targetGid = isLast ? mainGid : stepGids[i + 1];
-    const targetUri = `#gid=${targetGid}&range=A1`;
     const navRowIndex = stepNavRows[i] ?? 0;
-    return navRequest(gid, navRowIndex, label, targetUri);
+    requests.push(linkCellRequest(
+      gid, navRowIndex, 1, label, `#gid=${targetGid}&range=A1`,
+      BLUE_BG, WHITE, 13,
+    ));
+  });
+
+  // 2b. Main sheet index "→ 開く" buttons
+  // Index button cell is in column M (index 12) — the first cell of the M-N merge
+  const INDEX_BTN_COL = 12;  // column M (0-based)
+  indexNavRows.forEach((rowIdx, i) => {
+    if (i < stepGids.length) {
+      requests.push(linkCellRequest(
+        mainGid, rowIdx, INDEX_BTN_COL, '→ 開く', `#gid=${stepGids[i]}&range=A1`,
+        BTN_BG, WHITE, 11,
+      ));
+    }
   });
 
   if (requests.length === 0) return;
@@ -135,5 +157,3 @@ export async function addStepNavLinks(
     throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
   }
 }
-
-export { NAV_START_COL, NAV_END_COL };
