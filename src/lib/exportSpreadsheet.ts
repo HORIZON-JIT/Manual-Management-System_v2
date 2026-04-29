@@ -304,8 +304,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-    // C-N: step title
-    mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
+    // C-N (scroll) or C-M (jump): step title
+    const titleEndCol = navMode === 'jump' ? LAST_COL - 1 : LAST_COL;
+    mergeStyled(sws, row, CONTENT_START_COL, row, titleEndCol, `  ${step.title}`, {
       font: { bold: true, size: 13, color: { argb: C.stepTitle } },
       fill: solidFill(C.headerBg),
       alignment: { horizontal: 'left' },
@@ -316,6 +317,22 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         right: { style: 'thin', color: { argb: C.borderBlue } },
       },
     });
+
+    // N: nav link placeholder (styled here; Sheets API fills in the actual link)
+    if (navMode === 'jump') {
+      const isLastStep = i === sortedSteps.length - 1;
+      const navCell = sws.getCell(row, LAST_COL);
+      navCell.value = isLastStep ? '↑ 概要' : '次へ →';
+      navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
+      navCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      navCell.fill = solidFill(C.headerBg);
+      setBoxBorder(navCell, {
+        top: { style: 'thin', color: { argb: C.borderBlue } },
+        bottom: { style: 'medium', color: { argb: C.borderBlue } },
+        left: NO_BORDER,
+        right: { style: 'thin', color: { argb: C.borderBlue } },
+      });
+    }
     row++;
 
     // --- Description ---

@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
+import { uploadAsGoogleSheet } from '@/lib/googleDrive';
+import { addStepNavLinks } from '@/lib/sheetsNavLinks';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -191,14 +193,24 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     setSaving(true);
     setSaveMessage(null);
     try {
-      // Upload Excel
       const excelBuffer = await buildExcelBuffer(instruction, excelNavMode);
-      await saveFileToDrive(
-        excelBuffer,
-        `${instruction.title}_手順書.xlsx`,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      // Upload JSON
+
+      if (excelNavMode === 'jump') {
+        // ステップ別シートモード: Google Sheets ネイティブ形式でアップロード後、
+        // Sheets API で「次へ」ナビゲーションリンクを挿入
+        const sheetName = `${instruction.title}_手順書`;
+        const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
+        await addStepNavLinks(spreadsheetId, instruction);
+      } else {
+        // スクロールモード: 通常の XLSX としてアップロード
+        await saveFileToDrive(
+          excelBuffer,
+          `${instruction.title}_手順書.xlsx`,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      }
+
+      // Upload JSON (both modes)
       const jsonStr = JSON.stringify(instruction, null, 2);
       const jsonBuffer = new TextEncoder().encode(jsonStr).buffer;
       await saveFileToDrive(
@@ -209,7 +221,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       const folderName = getTargetFolder()?.name || 'WorkInstructions';
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveMessage({ text: `「${folderName}」にExcel・JSONを保存しました`, type: 'success' });
+      const fileType = excelNavMode === 'jump' ? 'Google スプレッドシート' : 'Excel';
+      setSaveMessage({ text: `「${folderName}」に${fileType}・JSONを保存しました`, type: 'success' });
       setTimeout(() => router.push('/'), 1500);
     } catch (err) {
       console.error('Drive save error:', err);
