@@ -154,7 +154,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   };
 
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error'; folderUrl?: string } | null>(null);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -209,10 +209,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         `${instruction.title}.json`,
         'application/json',
       );
-      const folderName = getTargetFolder()?.name || 'WorkInstructions';
+      const targetFolder = getTargetFolder();
+      const folderName = targetFolder?.name || 'WorkInstructions';
+      const folderUrl = targetFolder?.id
+        ? `https://drive.google.com/drive/folders/${targetFolder.id}`
+        : undefined;
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveMessage({ text: `「${folderName}」にスプレッドシート・JSONを保存しました`, type: 'success' });
+      setSaveMessage({ text: `「${folderName}」にスプレッドシート・JSONを保存しました`, type: 'success', folderUrl });
       setTimeout(() => router.push('/'), 1500);
     } catch (err) {
       console.error('Drive save error:', err);
@@ -487,7 +491,21 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         </button>
         {saveMessage && (
           <p className={`text-sm text-center ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {saveMessage.text}
+            {saveMessage.folderUrl ? (
+              <>
+                <a
+                  href={saveMessage.folderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium hover:opacity-80"
+                >
+                  {saveMessage.text.match(/「(.+)」/)?.[1] ?? 'フォルダ'}
+                </a>
+                {saveMessage.text.replace(/「.+」/, '')}
+              </>
+            ) : (
+              saveMessage.text
+            )}
           </p>
         )}
         <p className="text-xs text-slate-400 text-center">
