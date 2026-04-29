@@ -155,6 +155,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error'; folderUrl?: string } | null>(null);
+  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string } | null>(null);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -216,8 +217,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         : undefined;
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveMessage({ text: `「${folderName}」にスプレッドシート・JSONを保存しました`, type: 'success', folderUrl });
-      setTimeout(() => router.push('/'), 1500);
+      setSaveSuccessModal({ folderName, folderUrl });
     } catch (err) {
       console.error('Drive save error:', err);
       const msg = err instanceof Error
@@ -258,6 +258,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">
         {isEdit ? '手順書を編集' : '新規手順書作成'}
@@ -489,29 +490,50 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         >
           キャンセル
         </button>
-        {saveMessage && (
-          <p className={`text-sm text-center ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {saveMessage.folderUrl ? (
-              <>
-                <a
-                  href={saveMessage.folderUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline font-medium hover:opacity-80"
-                >
-                  {saveMessage.text.match(/「(.+)」/)?.[1] ?? 'フォルダ'}
-                </a>
-                {saveMessage.text.replace(/「.+」/, '')}
-              </>
-            ) : (
-              saveMessage.text
-            )}
-          </p>
+        {saveMessage && saveMessage.type === 'error' && (
+          <p className="text-sm text-center text-red-600">{saveMessage.text}</p>
         )}
         <p className="text-xs text-slate-400 text-center">
           「完成」を押すと、ヘッダーで指定したGoogleドライブフォルダにスプレッドシート・JSONを出力します
         </p>
       </div>
     </form>
+
+    {saveSuccessModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-5">
+          <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-base font-bold text-gray-800">保存しました</p>
+            <p className="text-sm text-gray-500">
+              保存先:{' '}
+              {saveSuccessModal.folderUrl ? (
+                <a
+                  href={saveSuccessModal.folderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline font-medium hover:opacity-80"
+                >
+                  {saveSuccessModal.folderName}
+                </a>
+              ) : (
+                <span className="font-medium text-gray-700">{saveSuccessModal.folderName}</span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
