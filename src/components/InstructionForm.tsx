@@ -437,7 +437,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               onChange={() => setExcelNavMode('jump')}
               className="accent-blue-600"
             />
-            <span className="text-sm text-slate-600">リンクジャンプ</span>
+            <span className="text-sm text-slate-600">ステップ別シート</span>
           </label>
         </div>
         {draftSaveMessage && (
