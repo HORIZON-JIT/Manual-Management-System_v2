@@ -496,10 +496,11 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       const navCell = ws.getCell(stepStartRows[i], LAST_COL);
       const isLast = i === stepStartRows.length - 1;
       const targetRow = isLast ? 1 : stepStartRows[i + 1];
+      const label = isLast ? '↑ 先頭' : '次へ →';
       navCell.value = {
-        text: isLast ? '↑ 先頭' : '次へ →',
-        hyperlink: `#'作業手順書'!A${targetRow}`,
-      } as ExcelJS.CellHyperlinkValue;
+        formula: `HYPERLINK("#gid=0&range=A${targetRow}","${label}")`,
+        result: label,
+      };
       navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
       navCell.alignment = { horizontal: 'center', vertical: 'middle' };
       navCell.fill = solidFill(C.headerBg);
