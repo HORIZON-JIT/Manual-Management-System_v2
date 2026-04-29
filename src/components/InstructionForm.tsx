@@ -154,7 +154,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   };
 
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error'; folderUrl?: string } | null>(null);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -195,19 +195,10 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     try {
       const { buffer: excelBuffer, stepNavRows, indexNavRows } = await buildExcelBuffer(instruction, excelNavMode);
 
+      const sheetName = `${instruction.title}_手順書`;
+      const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
       if (excelNavMode === 'jump') {
-        // ステップ別シートモード: Google Sheets ネイティブ形式でアップロード後、
-        // Sheets API で「次へ」ナビゲーションリンクを挿入
-        const sheetName = `${instruction.title}_手順書`;
-        const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
         await addStepNavLinks(spreadsheetId, instruction, stepNavRows, indexNavRows);
-      } else {
-        // スクロールモード: 通常の XLSX としてアップロード
-        await saveFileToDrive(
-          excelBuffer,
-          `${instruction.title}_手順書.xlsx`,
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
       }
 
       // Upload JSON (both modes)
@@ -218,11 +209,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         `${instruction.title}.json`,
         'application/json',
       );
-      const folderName = getTargetFolder()?.name || 'WorkInstructions';
+      const targetFolder = getTargetFolder();
+      const folderName = targetFolder?.name || 'WorkInstructions';
+      const folderUrl = targetFolder?.id
+        ? `https://drive.google.com/drive/folders/${targetFolder.id}`
+        : undefined;
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      const fileType = excelNavMode === 'jump' ? 'Google スプレッドシート' : 'Excel';
-      setSaveMessage({ text: `「${folderName}」に${fileType}・JSONを保存しました`, type: 'success' });
+      setSaveMessage({ text: `「${folderName}」にスプレッドシート・JSONを保存しました`, type: 'success', folderUrl });
       setTimeout(() => router.push('/'), 1500);
     } catch (err) {
       console.error('Drive save error:', err);
@@ -434,23 +428,23 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             <input
               type="radio"
               name="excelNavMode"
-              value="scroll"
-              checked={excelNavMode === 'scroll'}
-              onChange={() => setExcelNavMode('scroll')}
-              className="accent-blue-600"
-            />
-            <span className="text-sm text-slate-600">スクロール</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="radio"
-              name="excelNavMode"
               value="jump"
               checked={excelNavMode === 'jump'}
               onChange={() => setExcelNavMode('jump')}
               className="accent-blue-600"
             />
             <span className="text-sm text-slate-600">ステップ別シート</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="excelNavMode"
+              value="scroll"
+              checked={excelNavMode === 'scroll'}
+              onChange={() => setExcelNavMode('scroll')}
+              className="accent-blue-600"
+            />
+            <span className="text-sm text-slate-600">スクロール<span className="text-slate-400">（従来通り）</span></span>
           </label>
         </div>
         {draftSaveMessage && (
@@ -497,11 +491,25 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         </button>
         {saveMessage && (
           <p className={`text-sm text-center ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {saveMessage.text}
+            {saveMessage.folderUrl ? (
+              <>
+                <a
+                  href={saveMessage.folderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium hover:opacity-80"
+                >
+                  {saveMessage.text.match(/「(.+)」/)?.[1] ?? 'フォルダ'}
+                </a>
+                {saveMessage.text.replace(/「.+」/, '')}
+              </>
+            ) : (
+              saveMessage.text
+            )}
           </p>
         )}
         <p className="text-xs text-slate-400 text-center">
-          「完成」を押すと、ヘッダーで指定したGoogleドライブフォルダにExcel・JSONを出力します
+          「完成」を押すと、ヘッダーで指定したGoogleドライブフォルダにスプレッドシート・JSONを出力します
         </p>
       </div>
     </form>
