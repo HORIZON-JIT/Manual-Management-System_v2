@@ -193,14 +193,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     setSaving(true);
     setSaveMessage(null);
     try {
-      const { buffer: excelBuffer, stepNavRows } = await buildExcelBuffer(instruction, excelNavMode);
+      const { buffer: excelBuffer, stepNavRows, indexNavRows } = await buildExcelBuffer(instruction, excelNavMode);
 
       if (excelNavMode === 'jump') {
         // ステップ別シートモード: Google Sheets ネイティブ形式でアップロード後、
         // Sheets API で「次へ」ナビゲーションリンクを挿入
         const sheetName = `${instruction.title}_手順書`;
         const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
-        await addStepNavLinks(spreadsheetId, instruction, stepNavRows);
+        await addStepNavLinks(spreadsheetId, instruction, stepNavRows, indexNavRows);
       } else {
         // スクロールモード: 通常の XLSX としてアップロード
         await saveFileToDrive(

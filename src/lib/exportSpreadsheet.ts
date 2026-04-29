@@ -163,7 +163,8 @@ export type ExcelNavMode = 'scroll' | 'jump';
 
 export interface ExcelBuildResult {
   buffer: ArrayBuffer;
-  stepNavRows: number[];  // 0-based row index of nav footer in each step sheet (jump mode only)
+  stepNavRows: number[];   // 0-based row index of nav footer in each step sheet (jump mode only)
+  indexNavRows: number[];  // 0-based row index of each "→ 開く" button on main sheet (jump mode only)
 }
 
 export async function exportToExcel(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<void> {
@@ -269,6 +270,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   // ===== STEPS =====
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const stepNavRows: number[] = [];  // 0-based row index of nav footer per step sheet
+  const indexNavRows: number[] = [];  // 0-based row index of index buttons on main sheet
+  const mainSheetRowBeforeSteps = row;  // save row for main sheet (jump mode resets row)
 
   // Column definitions for reuse when creating per-step sheets
   const colDefs = [
@@ -535,25 +538,49 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   // ===== FOOTER (on main sheet) =====
-  // In jump mode, row was reset for each step sheet so recalculate for main sheet
   if (navMode === 'jump') {
-    // After the description/spacer section, add a step index on the main sheet
+    // Restore row to main sheet position (step loop resets row for each step sheet)
+    row = mainSheetRowBeforeSteps;
+
+    // Section header
+    ws.getRow(row).height = 32;
+    mergeStyled(ws, row, 1, row, LAST_COL, '  目次', {
+      font: { bold: true, size: 14, color: { argb: C.white } },
+      fill: solidFill(C.primaryMid),
+      alignment: { horizontal: 'left', vertical: 'middle' },
+      border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+    });
+    row++;
+
+    // Step index with jump buttons
+    const INDEX_BTN_COL = LAST_COL - 1; // column M (13)
     for (let i = 0; i < sortedSteps.length; i++) {
       const stepNum = String(i + 1).padStart(2, '0');
-      ws.getRow(row).height = 26;
-      mergeStyled(ws, row, 1, row, LAST_COL, `  ${stepNum}  ${sortedSteps[i].title}`, {
-        font: { size: 11, color: { argb: C.text } },
-        fill: solidFill(i % 2 === 0 ? C.white : C.grayLight),
+      const bg = i % 2 === 0 ? C.white : C.grayLight;
+      ws.getRow(row).height = 32;
+
+      // A-L: step title
+      mergeStyled(ws, row, 1, row, INDEX_BTN_COL - 1, `  ${stepNum}  ${sortedSteps[i].title}`, {
+        font: { size: 12, color: { argb: C.text } },
+        fill: solidFill(bg),
         alignment: { horizontal: 'left', vertical: 'middle' },
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
       });
+
+      // M-N: "→ 開く" button placeholder (link added by Sheets API)
+      mergeStyled(ws, row, INDEX_BTN_COL, row, LAST_COL, '→ 開く', {
+        font: { bold: true, size: 11, color: { argb: C.white } },
+        fill: solidFill(C.primaryLight),
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+      });
+
+      indexNavRows.push(row - 1);  // 0-based for Sheets API
       row++;
     }
-    ws.getRow(row).height = 6;
-    row++;
   }
   ws.getRow(row).height = 22;
-  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ${navMode === 'jump' ? '（各ステップは下部のシートタブから閲覧）' : ''}  `, {
+  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ  `, {
     font: { size: 9, italic: true, color: { argb: C.gray } },
     fill: solidFill(C.grayMid),
     alignment: { horizontal: 'right' },
@@ -686,7 +713,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   const buffer = await wb.xlsx.writeBuffer();
-  return { buffer: buffer as ArrayBuffer, stepNavRows };
+  return { buffer: buffer as ArrayBuffer, stepNavRows, indexNavRows };
 }
 
 // ============================================================
