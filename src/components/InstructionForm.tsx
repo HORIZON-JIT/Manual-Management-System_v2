@@ -428,23 +428,23 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             <input
               type="radio"
               name="excelNavMode"
-              value="scroll"
-              checked={excelNavMode === 'scroll'}
-              onChange={() => setExcelNavMode('scroll')}
-              className="accent-blue-600"
-            />
-            <span className="text-sm text-slate-600">スクロール</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="radio"
-              name="excelNavMode"
               value="jump"
               checked={excelNavMode === 'jump'}
               onChange={() => setExcelNavMode('jump')}
               className="accent-blue-600"
             />
             <span className="text-sm text-slate-600">ステップ別シート</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="excelNavMode"
+              value="scroll"
+              checked={excelNavMode === 'scroll'}
+              onChange={() => setExcelNavMode('scroll')}
+              className="accent-blue-600"
+            />
+            <span className="text-sm text-slate-600">スクロール<span className="text-slate-400">（従来通り）</span></span>
           </label>
         </div>
         {draftSaveMessage && (
