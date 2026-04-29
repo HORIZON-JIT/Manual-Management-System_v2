@@ -263,32 +263,49 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
   // ===== STEPS =====
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
-  const stepStartRows: number[] = [];
-  const titleEndCol = navMode === 'jump' ? LAST_COL - 1 : LAST_COL;
+
+  // Column definitions for reuse when creating per-step sheets
+  const colDefs = [
+    { width: 1.5 },  // A
+    { width: 6 },    // B
+    ...Array(12).fill(null).map(() => ({ width: contentColWidth })), // C-N
+  ];
 
   for (let i = 0; i < sortedSteps.length; i++) {
     const step = sortedSteps[i];
     const stepNum = String(i + 1).padStart(2, '0');
-    stepStartRows.push(row);
+
+    // In jump mode, each step gets its own sheet tab for navigation
+    let sws = ws;
+    if (navMode === 'jump') {
+      const rawName = `${stepNum} ${step.title}`;
+      const tabName = rawName.replace(/[\\/*?[\]:]/g, '').substring(0, 31);
+      sws = wb.addWorksheet(tabName, {
+        pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+        properties: { showGridLines: false },
+      });
+      sws.columns = colDefs.map(c => ({ ...c }));
+      row = 1;
+    }
 
     // --- Step header row ---
-    ws.getRow(row).height = 34;
+    sws.getRow(row).height = 34;
 
     // A: accent stripe
-    const accentCell = ws.getCell(row, 1);
+    const accentCell = sws.getCell(row, 1);
     accentCell.fill = solidFill(C.accent);
     setBoxBorder(accentCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
     // B: step number
-    const numCell = ws.getCell(row, 2);
+    const numCell = sws.getCell(row, 2);
     numCell.value = stepNum;
     numCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.white } };
     numCell.fill = solidFill(C.primaryMid);
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-    // C-M or C-N: step title (narrower when jump mode to leave room for nav link)
-    mergeStyled(ws, row, CONTENT_START_COL, row, titleEndCol, `  ${step.title}`, {
+    // C-N: step title
+    mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
       font: { bold: true, size: 13, color: { argb: C.stepTitle } },
       fill: solidFill(C.headerBg),
       alignment: { horizontal: 'left' },
@@ -303,15 +320,15 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Description ---
     if (step.description) {
-      ws.getRow(row).height = calcRowHeight(step.description, 60, 18, 32);
+      sws.getRow(row).height = calcRowHeight(step.description, 60, 18, 32);
 
       // A: accent
-      const aCell = ws.getCell(row, 1);
+      const aCell = sws.getCell(row, 1);
       aCell.fill = solidFill(C.accent);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
       // B: label
-      const labelCell = ws.getCell(row, 2);
+      const labelCell = sws.getCell(row, 2);
       labelCell.value = '説明';
       labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.gray } };
       labelCell.fill = solidFill(C.grayLight);
@@ -319,7 +336,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       setBoxBorder(labelCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
       // C-N: description content
-      mergeStyled(ws, row, CONTENT_START_COL, row, LAST_COL, step.description, {
+      mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.description, {
         font: { size: 10, color: { argb: C.text } },
         fill: solidFill(C.white),
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
@@ -329,15 +346,15 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Caution ---
     if (step.caution) {
-      ws.getRow(row).height = calcRowHeight(step.caution, 60, 18, 28);
+      sws.getRow(row).height = calcRowHeight(step.caution, 60, 18, 28);
 
       // A: amber accent
-      const aCell = ws.getCell(row, 1);
+      const aCell = sws.getCell(row, 1);
       aCell.fill = solidFill(C.cautionBorder);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
       // B: label
-      const labelCell = ws.getCell(row, 2);
+      const labelCell = sws.getCell(row, 2);
       labelCell.value = '⚠ 注意';
       labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.cautionText } };
       labelCell.fill = solidFill(C.cautionBg);
@@ -350,7 +367,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       });
 
       // C-N: caution text
-      mergeStyled(ws, row, CONTENT_START_COL, row, LAST_COL, step.caution, {
+      mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.caution, {
         font: { size: 10, color: { argb: C.cautionText } },
         fill: solidFill(C.cautionBg),
         border: {
@@ -391,32 +408,32 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       const imageStartRow = row;
 
       for (let r = 0; r < imageRows; r++) {
-        ws.getRow(imageStartRow + r).height = IMAGE_ROW_HEIGHT;
+        sws.getRow(imageStartRow + r).height = IMAGE_ROW_HEIGHT;
         // A: accent stripe continuation
-        const aCell = ws.getCell(imageStartRow + r, 1);
+        const aCell = sws.getCell(imageStartRow + r, 1);
         aCell.fill = solidFill(C.accent);
         setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
         // B: label column (separate from image merge)
-        const bCell = ws.getCell(imageStartRow + r, 2);
+        const bCell = sws.getCell(imageStartRow + r, 2);
         bCell.fill = solidFill(C.grayLight);
         setBoxBorder(bCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
       }
 
       // B label text on first row
-      const labelCell = ws.getCell(imageStartRow, 2);
+      const labelCell = sws.getCell(imageStartRow, 2);
       labelCell.value = stepImages.length > 1 ? `画像 ${imgIdx + 1}` : '画像';
       labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.gray } };
       labelCell.alignment = { horizontal: 'center', vertical: 'top' };
 
       // Merge image region C-N only (not B)
-      ws.mergeCells(imageStartRow, CONTENT_START_COL, imageStartRow + imageRows - 1, LAST_COL);
-      const imgCell = ws.getCell(imageStartRow, CONTENT_START_COL);
+      sws.mergeCells(imageStartRow, CONTENT_START_COL, imageStartRow + imageRows - 1, LAST_COL);
+      const imgCell = sws.getCell(imageStartRow, CONTENT_START_COL);
       imgCell.fill = solidFill(C.grayLight);
       imgCell.alignment = { vertical: 'middle', horizontal: 'center' };
       for (let r = imageStartRow; r < imageStartRow + imageRows; r++) {
         for (let c = CONTENT_START_COL; c <= LAST_COL; c++) {
-          setBoxBorder(ws.getCell(r, c), { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
+          setBoxBorder(sws.getCell(r, c), { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
         }
       }
 
@@ -424,7 +441,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       const { base64, extension } = parseDataUrl(stepImages[imgIdx]);
       const imageId = wb.addImage({ base64, extension });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ws.addImage(imageId, {
+      sws.addImage(imageId, {
         tl: { col: CONTENT_START_COL - 1 + 0.2, row: imageStartRow - 1 + 0.3 },
         ext: { width: imgW, height: imgH },
       } as any);
@@ -434,17 +451,17 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // Caption row
       const caption = getImageCaption(step, imgIdx);
       if (caption) {
-        ws.getRow(row).height = calcRowHeight(caption, 60, 16, 22);
+        sws.getRow(row).height = calcRowHeight(caption, 60, 16, 22);
 
-        const aCap = ws.getCell(row, 1);
+        const aCap = sws.getCell(row, 1);
         aCap.fill = solidFill(C.accent);
         setBoxBorder(aCap, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-        const bCap = ws.getCell(row, 2);
+        const bCap = sws.getCell(row, 2);
         bCap.fill = solidFill(C.grayLight);
         setBoxBorder(bCap, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
-        mergeStyled(ws, row, CONTENT_START_COL, row, LAST_COL, caption, {
+        mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, caption, {
           font: { size: 9, italic: true, color: { argb: C.gray } },
           fill: solidFill(C.grayLight),
           border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
@@ -455,15 +472,15 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Video URL ---
     if (step.videoUrl) {
-      ws.getRow(row).height = 24;
+      sws.getRow(row).height = 24;
 
       // A: accent
-      const aCell = ws.getCell(row, 1);
+      const aCell = sws.getCell(row, 1);
       aCell.fill = solidFill(C.accent);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
       // B: label
-      const labelCell = ws.getCell(row, 2);
+      const labelCell = sws.getCell(row, 2);
       labelCell.value = '▶ 動画';
       labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.primaryMid } };
       labelCell.fill = solidFill(C.white);
@@ -471,68 +488,45 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       setBoxBorder(labelCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
       // C-N: url
-      mergeStyled(ws, row, CONTENT_START_COL, row, LAST_COL, step.videoUrl, {
+      mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.videoUrl, {
         font: { size: 10, color: { argb: C.primaryMid }, underline: true },
         fill: solidFill(C.white),
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
       });
-      ws.getCell(row, CONTENT_START_COL).value = {
+      sws.getCell(row, CONTENT_START_COL).value = {
         text: step.videoUrl,
         hyperlink: step.videoUrl,
       } as ExcelJS.CellHyperlinkValue;
       row++;
     }
 
-    // Spacer between steps
-    if (i < sortedSteps.length - 1) {
+    // Spacer between steps (scroll mode only)
+    if (navMode === 'scroll' && i < sortedSteps.length - 1) {
       ws.getRow(row).height = 10;
       row++;
     }
   }
 
-  // ===== NAV LINKS (jump mode only) =====
-  // Strategy: define a named range for each step anchor, then use
-  // HYPERLINK("#RangeName","text") — the only format that reliably
-  // navigates within Google Sheets when imported from XLSX.
+  // ===== FOOTER (on main sheet) =====
+  // In jump mode, row was reset for each step sheet so recalculate for main sheet
   if (navMode === 'jump') {
-    // 1. Define named ranges for each step start row
-    const sheetRef = '作業手順書';
-    for (let i = 0; i < stepStartRows.length; i++) {
-      // Named range "Step_1", "Step_2", ... pointing to col A of that row
-      wb.definedNames.add(
-        `'${sheetRef}'!$A$${stepStartRows[i]}`,
-        `Step_${i + 1}`,
-      );
-    }
-    // Named range for the top (row 1)
-    wb.definedNames.add(`'${sheetRef}'!$A$1`, 'Step_Top');
-
-    // 2. Set nav cells using #RangeName hyperlinks
-    for (let i = 0; i < stepStartRows.length; i++) {
-      const navCell = ws.getCell(stepStartRows[i], LAST_COL);
-      const isLast = i === stepStartRows.length - 1;
-      const targetName = isLast ? 'Step_Top' : `Step_${i + 2}`;
-      const label = isLast ? '↑ 先頭' : '次へ →';
-      navCell.value = {
-        formula: `HYPERLINK("#${targetName}","${label}")`,
-        result: label,
-      };
-      navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
-      navCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      navCell.fill = solidFill(C.headerBg);
-      setBoxBorder(navCell, {
-        top: { style: 'thin', color: { argb: C.borderBlue } },
-        bottom: { style: 'medium', color: { argb: C.borderBlue } },
-        left: NO_BORDER,
-        right: { style: 'thin', color: { argb: C.borderBlue } },
+    // After the description/spacer section, add a step index on the main sheet
+    for (let i = 0; i < sortedSteps.length; i++) {
+      const stepNum = String(i + 1).padStart(2, '0');
+      ws.getRow(row).height = 26;
+      mergeStyled(ws, row, 1, row, LAST_COL, `  ${stepNum}  ${sortedSteps[i].title}`, {
+        font: { size: 11, color: { argb: C.text } },
+        fill: solidFill(i % 2 === 0 ? C.white : C.grayLight),
+        alignment: { horizontal: 'left', vertical: 'middle' },
+        border: { top: THIN_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
       });
+      row++;
     }
+    ws.getRow(row).height = 6;
+    row++;
   }
-
-  // ===== FOOTER =====
-  row++;
   ws.getRow(row).height = 22;
-  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ  `, {
+  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ${navMode === 'jump' ? '（各ステップは下部のシートタブから閲覧）' : ''}  `, {
     font: { size: 9, italic: true, color: { argb: C.gray } },
     fill: solidFill(C.grayMid),
     alignment: { horizontal: 'right' },
