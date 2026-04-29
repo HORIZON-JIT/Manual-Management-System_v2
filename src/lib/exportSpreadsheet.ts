@@ -22,22 +22,22 @@ const C = {
   badgeOrangeBg: 'FFEDD5',  // orange-100
   badgeOrangeText: 'C2410C',// orange-700
   white: 'FFFFFF',
-  dark: '1F2937',           // gray-800
-  text: '374151',           // gray-700
-  gray: '6B7280',           // gray-500
+  dark: '111827',           // gray-900
+  text: '1F2937',           // gray-800 (was gray-700 — darkened for readability)
+  gray: '374151',           // gray-700 (was gray-500 — darkened for readability)
   grayLight: 'F9FAFB',      // gray-50
   grayMid: 'F3F4F6',        // gray-100
-  border: 'E5E7EB',         // gray-200
+  border: 'D1D5DB',         // gray-300 (was gray-200 — slightly more visible)
   borderLight: 'F3F4F6',    // gray-100
   borderBlue: 'BFDBFE',     // blue-200
   cautionBg: 'FEF3C7',      // amber-100
-  cautionText: '92400E',    // amber-800
+  cautionText: '78350F',    // amber-900 (was amber-800 — darker for readability)
   cautionBorder: 'F59E0B',  // amber-400
   stepTitle: '1E3A5F',      // dark blue
   accent: '2563EB',         // blue for accent strip
 };
 
-const THIN_BORDER: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: C.border } };
+const THIN_BORDER: Partial<ExcelJS.Border> = { style: 'medium', color: { argb: C.border } };
 const NO_BORDER: Partial<ExcelJS.Border> = { style: undefined };
 
 function parseDataUrl(dataUrl: string): { base64: string; extension: 'png' | 'jpeg' } {
@@ -202,9 +202,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   let row = 1;
 
   // ===== TITLE BANNER =====
-  ws.getRow(row).height = 44;
+  ws.getRow(row).height = 52;
   mergeStyled(ws, row, 1, row, LAST_COL, instruction.title, {
-    font: { bold: true, size: 20, color: { argb: C.white } },
+    font: { bold: true, size: 22, color: { argb: C.white } },
     fill: solidFill(C.primary),
     alignment: { horizontal: 'center' },
     border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
@@ -212,9 +212,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   row++;
 
   // Subtitle "作業手順書"
-  ws.getRow(row).height = 22;
+  ws.getRow(row).height = 26;
   mergeStyled(ws, row, 1, row, LAST_COL, '作業手順書', {
-    font: { size: 10, color: { argb: C.white } },
+    font: { size: 12, color: { argb: C.white } },
     fill: solidFill(C.primaryMid),
     alignment: { horizontal: 'center' },
     border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
@@ -228,10 +228,10 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   };
   const catC = catColors[instruction.category] || catColors.pc_work;
 
-  ws.getRow(row).height = 26;
+  ws.getRow(row).height = 30;
   // Category (left)
   mergeStyled(ws, row, 1, row, 5, `  ${getCategoryLabel(instruction.category)}`, {
-    font: { size: 10, bold: true, color: { argb: catC.text } },
+    font: { size: 11, bold: true, color: { argb: catC.text } },
     fill: solidFill(catC.bg),
     alignment: { horizontal: 'left' },
     border: { top: THIN_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
@@ -244,7 +244,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   const authorParts = [creatorStr, updaterStr].filter(Boolean).join('  |  ');
   const metaRight = `${authorParts ? authorParts + '  |  ' : ''}作成: ${created}  |  更新: ${updated}  `;
   mergeStyled(ws, row, 6, row, LAST_COL, metaRight, {
-    font: { size: 9, color: { argb: C.gray } },
+    font: { size: 10, color: { argb: C.gray } },
     fill: solidFill(C.grayLight),
     alignment: { horizontal: 'right' },
     border: { top: THIN_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
@@ -253,9 +253,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
   // ===== DESCRIPTION =====
   if (instruction.description) {
-    ws.getRow(row).height = calcRowHeight(instruction.description, 70, 18, 28);
+    ws.getRow(row).height = calcRowHeight(instruction.description, 65, 20, 36);
     mergeStyled(ws, row, 1, row, LAST_COL, `  ${instruction.description}`, {
-      font: { size: 10, color: { argb: C.text } },
+      font: { size: 12, color: { argb: C.text } },
       fill: solidFill(C.white),
       border: { top: NO_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
     });
@@ -295,7 +295,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     }
 
     // --- Step header row ---
-    sws.getRow(row).height = 34;
+    sws.getRow(row).height = 42;
 
     // A: accent stripe
     const accentCell = sws.getCell(row, 1);
@@ -305,14 +305,14 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     // B: step number
     const numCell = sws.getCell(row, 2);
     numCell.value = stepNum;
-    numCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.white } };
+    numCell.font = { name: 'Arial', bold: true, size: 18, color: { argb: C.white } };
     numCell.fill = solidFill(C.primaryMid);
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
     // C-N: step title (full width always)
     mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
-      font: { bold: true, size: 13, color: { argb: C.stepTitle } },
+      font: { bold: true, size: 15, color: { argb: C.stepTitle } },
       fill: solidFill(C.headerBg),
       alignment: { horizontal: 'left' },
       border: {
@@ -326,7 +326,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Description ---
     if (step.description) {
-      sws.getRow(row).height = calcRowHeight(step.description, 60, 18, 32);
+      sws.getRow(row).height = calcRowHeight(step.description, 58, 20, 40);
 
       // A: accent
       const aCell = sws.getCell(row, 1);
@@ -336,14 +336,14 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // B: label
       const labelCell = sws.getCell(row, 2);
       labelCell.value = '説明';
-      labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.gray } };
+      labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.gray } };
       labelCell.fill = solidFill(C.grayLight);
       labelCell.alignment = { horizontal: 'center', vertical: 'top' };
       setBoxBorder(labelCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
       // C-N: description content
       mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.description, {
-        font: { size: 10, color: { argb: C.text } },
+        font: { size: 12, color: { argb: C.text } },
         fill: solidFill(C.white),
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
       });
@@ -352,7 +352,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Caution ---
     if (step.caution) {
-      sws.getRow(row).height = calcRowHeight(step.caution, 60, 18, 28);
+      sws.getRow(row).height = calcRowHeight(step.caution, 58, 20, 36);
 
       // A: amber accent
       const aCell = sws.getCell(row, 1);
@@ -362,7 +362,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // B: label
       const labelCell = sws.getCell(row, 2);
       labelCell.value = '⚠ 注意';
-      labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.cautionText } };
+      labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.cautionText } };
       labelCell.fill = solidFill(C.cautionBg);
       labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
       setBoxBorder(labelCell, {
@@ -374,7 +374,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
       // C-N: caution text
       mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.caution, {
-        font: { size: 10, color: { argb: C.cautionText } },
+        font: { size: 12, color: { argb: C.cautionText } },
         fill: solidFill(C.cautionBg),
         border: {
           top: { style: 'thin', color: { argb: C.cautionBorder } },
@@ -429,7 +429,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // B label text on first row
       const labelCell = sws.getCell(imageStartRow, 2);
       labelCell.value = stepImages.length > 1 ? `画像 ${imgIdx + 1}` : '画像';
-      labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.gray } };
+      labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.gray } };
       labelCell.alignment = { horizontal: 'center', vertical: 'top' };
 
       // Merge image region C-N only (not B)
@@ -457,7 +457,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // Caption row
       const caption = getImageCaption(step, imgIdx);
       if (caption) {
-        sws.getRow(row).height = calcRowHeight(caption, 60, 16, 22);
+        sws.getRow(row).height = calcRowHeight(caption, 58, 18, 28);
 
         const aCap = sws.getCell(row, 1);
         aCap.fill = solidFill(C.accent);
@@ -468,7 +468,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         setBoxBorder(bCap, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
         mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, caption, {
-          font: { size: 9, italic: true, color: { argb: C.gray } },
+          font: { size: 11, italic: true, color: { argb: C.gray } },
           fill: solidFill(C.grayLight),
           border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
         });
@@ -478,7 +478,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
     // --- Video URL ---
     if (step.videoUrl) {
-      sws.getRow(row).height = 24;
+      sws.getRow(row).height = 30;
 
       // A: accent
       const aCell = sws.getCell(row, 1);
@@ -488,14 +488,14 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // B: label
       const labelCell = sws.getCell(row, 2);
       labelCell.value = '▶ 動画';
-      labelCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.primaryMid } };
+      labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.primaryMid } };
       labelCell.fill = solidFill(C.white);
       labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
       setBoxBorder(labelCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
 
       // C-N: url
       mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.videoUrl, {
-        font: { size: 10, color: { argb: C.primaryMid }, underline: true },
+        font: { size: 11, color: { argb: C.primaryMid }, underline: true },
         fill: solidFill(C.white),
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
       });
