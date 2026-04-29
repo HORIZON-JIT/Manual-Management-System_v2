@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className="bg-[#f5f5f7] min-h-screen">
+      <body className="bg-slate-50 min-h-screen">
         <Header />
         <main>{children}</main>
       </body>

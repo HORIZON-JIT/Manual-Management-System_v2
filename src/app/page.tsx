@@ -71,91 +71,95 @@ export default function HomePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Hero section */}
-      <div className="text-center mb-14">
-        <h1 className="text-4xl font-bold text-[#1d1d1f] tracking-tight mb-3">手順書作成システム</h1>
-        <p className="text-[#6e6e73] text-lg">作業手順書の作成・更新・管理を行います</p>
+      <div className="text-center mb-12">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-5 shadow-lg">
+          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h1 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">手順書作成システム</h1>
+        <p className="text-slate-500">作業手順書の作成・更新を行います</p>
       </div>
 
-      {/* Workflow cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      {/* 3 workflow buttons */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* 新規作成 */}
         <Link
           href="/instructions/new"
-          className="group bg-white rounded-2xl border border-[#e8e8ed] hover:shadow-lg p-7 flex flex-col items-center text-center transition-all duration-200"
+          className="group relative bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 p-8 text-center transition-all duration-200 hover:shadow-xl"
         >
-          <div className="w-12 h-12 rounded-xl bg-[#f5f5f7] flex items-center justify-center mb-4 group-hover:bg-[#e8e8ed] transition-colors">
-            <svg className="w-6 h-6 text-[#0071e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-50 group-hover:bg-blue-100 rounded-xl mb-4 transition">
+            <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </div>
-          <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">新規作成</h2>
-          <p className="text-sm text-[#6e6e73]">1から手順書を作成します</p>
-          <span className="mt-4 text-xs text-[#0071e3] group-hover:underline">開く →</span>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">新規作成</h2>
+          <p className="text-sm text-slate-500">1から手順書を作成します</p>
         </Link>
 
         {/* 途中から編集 */}
         <Link
           href="/instructions/drafts"
-          className="group bg-white rounded-2xl border border-[#e8e8ed] hover:shadow-lg p-7 flex flex-col items-center text-center transition-all duration-200"
+          className="group relative bg-white rounded-2xl border-2 border-slate-200 hover:border-amber-400 p-8 text-center transition-all duration-200 hover:shadow-xl"
         >
-          <div className="w-12 h-12 rounded-xl bg-[#f5f5f7] flex items-center justify-center mb-4 group-hover:bg-[#e8e8ed] transition-colors">
-            <svg className="w-6 h-6 text-[#0071e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-50 group-hover:bg-amber-100 rounded-xl mb-4 transition">
+            <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </div>
-          <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">途中から編集</h2>
-          <p className="text-sm text-[#6e6e73]">下書きの編集を再開</p>
-          <span className="mt-4 text-xs text-[#0071e3] group-hover:underline">開く →</span>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">途中から編集</h2>
+          <p className="text-sm text-slate-500">下書きの編集を再開</p>
         </Link>
 
         {/* 手順書更新 */}
         <button
           type="button"
           onClick={handleUpdateClick}
-          className="group bg-white rounded-2xl border border-[#e8e8ed] hover:shadow-lg p-7 flex flex-col items-center text-center transition-all duration-200 cursor-pointer"
+          className="group relative bg-white rounded-2xl border-2 border-slate-200 hover:border-emerald-400 p-8 text-center transition-all duration-200 hover:shadow-xl cursor-pointer"
         >
-          <div className="w-12 h-12 rounded-xl bg-[#f5f5f7] flex items-center justify-center mb-4 group-hover:bg-[#e8e8ed] transition-colors">
-            <svg className="w-6 h-6 text-[#0071e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-50 group-hover:bg-emerald-100 rounded-xl mb-4 transition">
+            <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
           </div>
-          <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">手順書更新</h2>
-          <p className="text-sm text-[#6e6e73]">DriveのJSONを読み込んで更新</p>
-          <span className="mt-4 text-xs text-[#0071e3] group-hover:underline">開く →</span>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">手順書更新</h2>
+          <p className="text-sm text-slate-500">DriveのJSONを読み込んで更新</p>
         </button>
 
         {/* 手順書確認 */}
         <button
           type="button"
           onClick={handlePreviewClick}
-          className="group bg-white rounded-2xl border border-[#e8e8ed] hover:shadow-lg p-7 flex flex-col items-center text-center transition-all duration-200 cursor-pointer"
+          className="group relative bg-white rounded-2xl border-2 border-slate-200 hover:border-violet-400 p-8 text-center transition-all duration-200 hover:shadow-xl cursor-pointer"
         >
-          <div className="w-12 h-12 rounded-xl bg-[#f5f5f7] flex items-center justify-center mb-4 group-hover:bg-[#e8e8ed] transition-colors">
-            <svg className="w-6 h-6 text-[#0071e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-violet-50 group-hover:bg-violet-100 rounded-xl mb-4 transition">
+            <svg className="w-7 h-7 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           </div>
-          <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">手順書確認</h2>
-          <p className="text-sm text-[#6e6e73]">DriveのJSONをプレビュー表示</p>
-          <span className="mt-4 text-xs text-[#0071e3] group-hover:underline">開く →</span>
+          <h2 className="text-lg font-bold text-slate-800 mb-2">手順書確認</h2>
+          <p className="text-sm text-slate-500">DriveのJSONをプレビュー表示</p>
         </button>
       </div>
 
       {/* Error message */}
       {importError && (
-        <div className="mb-6 p-4 bg-[#fff2f2] border border-[#ff3b30]/30 rounded-2xl text-sm text-[#c00]">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {importError}
         </div>
       )}
 
+      {/* Drive JSON File Picker */}
       <DriveJsonFilePicker
         open={showJsonPicker}
         onClose={() => setShowJsonPicker(false)}
         onFileLoaded={handleJsonFileLoaded}
       />
+
+      {/* Preview JSON File Picker */}
       <DriveJsonFilePicker
         open={showPreviewPicker}
         onClose={() => setShowPreviewPicker(false)}
