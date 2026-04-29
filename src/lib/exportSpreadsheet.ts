@@ -161,12 +161,17 @@ const solidFill = (color: string): ExcelJS.Fill => ({
 
 export type ExcelNavMode = 'scroll' | 'jump';
 
+export interface ExcelBuildResult {
+  buffer: ArrayBuffer;
+  stepNavRows: number[];  // 0-based row index of nav footer in each step sheet (jump mode only)
+}
+
 export async function exportToExcel(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<void> {
-  const buffer = await buildExcelBuffer(instruction, navMode);
+  const { buffer } = await buildExcelBuffer(instruction, navMode);
   downloadBuffer(buffer, `${instruction.title}_手順書.xlsx`);
 }
 
-export async function buildExcelBuffer(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<ArrayBuffer> {
+export async function buildExcelBuffer(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<ExcelBuildResult> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('作業手順書', {
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
@@ -263,6 +268,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
   // ===== STEPS =====
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const stepNavRows: number[] = [];  // 0-based row index of nav footer per step sheet
 
   // Column definitions for reuse when creating per-step sheets
   const colDefs = [
@@ -304,9 +310,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-    // C-N (scroll) or C-M (jump): step title
-    const titleEndCol = navMode === 'jump' ? LAST_COL - 1 : LAST_COL;
-    mergeStyled(sws, row, CONTENT_START_COL, row, titleEndCol, `  ${step.title}`, {
+    // C-N: step title (full width always)
+    mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
       font: { bold: true, size: 13, color: { argb: C.stepTitle } },
       fill: solidFill(C.headerBg),
       alignment: { horizontal: 'left' },
@@ -317,22 +322,6 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         right: { style: 'thin', color: { argb: C.borderBlue } },
       },
     });
-
-    // N: nav link placeholder (styled here; Sheets API fills in the actual link)
-    if (navMode === 'jump') {
-      const isLastStep = i === sortedSteps.length - 1;
-      const navCell = sws.getCell(row, LAST_COL);
-      navCell.value = isLastStep ? '↑ 概要' : '次へ →';
-      navCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 9, bold: true };
-      navCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      navCell.fill = solidFill(C.headerBg);
-      setBoxBorder(navCell, {
-        top: { style: 'thin', color: { argb: C.borderBlue } },
-        bottom: { style: 'medium', color: { argb: C.borderBlue } },
-        left: NO_BORDER,
-        right: { style: 'thin', color: { argb: C.borderBlue } },
-      });
-    }
     row++;
 
     // --- Description ---
@@ -517,6 +506,27 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       row++;
     }
 
+    // Nav footer row at the bottom of each step sheet (jump mode only)
+    if (navMode === 'jump') {
+      const isLastStep = i === sortedSteps.length - 1;
+      sws.getRow(row).height = 36;
+
+      // A: accent stripe
+      const aNav = sws.getCell(row, 1);
+      aNav.fill = solidFill(C.accent);
+
+      // B-N: nav button (merged, blue bar)
+      mergeStyled(sws, row, 2, row, LAST_COL, isLastStep ? '↑ 概要へ戻る' : '次へ →', {
+        font: { bold: true, size: 13, color: { argb: C.white } },
+        fill: solidFill(C.primaryMid),
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+      });
+
+      stepNavRows.push(row - 1);  // 0-based for Sheets API
+      row++;
+    }
+
     // Spacer between steps (scroll mode only)
     if (navMode === 'scroll' && i < sortedSteps.length - 1) {
       ws.getRow(row).height = 10;
@@ -676,7 +686,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   const buffer = await wb.xlsx.writeBuffer();
-  return buffer as ArrayBuffer;
+  return { buffer: buffer as ArrayBuffer, stepNavRows };
 }
 
 // ============================================================

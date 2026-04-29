@@ -140,7 +140,7 @@ function InstructionViewContent() {
     if (!instruction) return;
     setDriveSaving(true);
     try {
-      const buffer = await buildExcelBuffer(instruction);
+      const { buffer } = await buildExcelBuffer(instruction);
       const fileName = `${instruction.title}_手順書.xlsx`;
       await saveFileToDrive(
         buffer,

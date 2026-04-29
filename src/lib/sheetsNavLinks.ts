@@ -16,15 +16,16 @@ function stepTabName(index: number, title: string): string {
   return `${stepNum} ${title}`.replace(/[\\/*?[\]:]/g, '').substring(0, 31);
 }
 
-const NAV_COL_INDEX = 13; // column N (0-based)
-const HEADER_ROW_INDEX = 0; // first row of each step sheet
+// Nav footer spans col B (1, 0-based) to N (13, 0-based); value is in col B
+const NAV_START_COL = 1;  // column B (0-based)
+const NAV_END_COL = 14;   // exclusive
 
-const BLUE_FG = { red: 0.145, green: 0.388, blue: 0.922 };
-const HEADER_BG = { red: 0.937, green: 0.961, blue: 1.0 };
-const BORDER_BLUE = { red: 0.388, green: 0.533, blue: 0.933 };
+const BLUE_BG = { red: 0.145, green: 0.388, blue: 0.922 };
+const WHITE = { red: 1.0, green: 1.0, blue: 1.0 };
 
 function navRequest(
   sheetId: number,
+  navRowIndex: number,  // 0-based row index of the nav footer row
   label: string,
   targetUri: string,
 ) {
@@ -32,33 +33,30 @@ function navRequest(
     updateCells: {
       range: {
         sheetId,
-        startRowIndex: HEADER_ROW_INDEX,
-        endRowIndex: HEADER_ROW_INDEX + 1,
-        startColumnIndex: NAV_COL_INDEX,
-        endColumnIndex: NAV_COL_INDEX + 1,
+        startRowIndex: navRowIndex,
+        endRowIndex: navRowIndex + 1,
+        startColumnIndex: NAV_START_COL,
+        endColumnIndex: NAV_START_COL + 1,  // only update the first cell of the merge
       },
       rows: [{
         values: [{
           userEnteredValue: { stringValue: label },
           userEnteredFormat: {
-            backgroundColor: HEADER_BG,
+            backgroundColor: BLUE_BG,
             horizontalAlignment: 'CENTER',
             verticalAlignment: 'MIDDLE',
             textFormat: {
-              foregroundColor: BLUE_FG,
-              underline: true,
+              foregroundColor: WHITE,
               bold: true,
-              fontSize: 9,
-            },
-            borders: {
-              top: { style: 'SOLID', color: BORDER_BLUE },
-              bottom: { style: 'SOLID_MEDIUM', color: BORDER_BLUE },
-              right: { style: 'SOLID', color: BORDER_BLUE },
+              fontSize: 13,
             },
           },
           textFormatRuns: [{
             startIndex: 0,
-            format: { link: { uri: targetUri } },
+            format: {
+              foregroundColor: WHITE,
+              link: { uri: targetUri },
+            },
           }],
         }],
       }],
@@ -69,11 +67,13 @@ function navRequest(
 
 /**
  * After uploading an XLSX (converted to Google Sheets format), add proper
- * internal navigation links to each step sheet's header row (column N).
+ * internal navigation links to the nav footer row at the bottom of each step sheet.
+ * stepNavRows[i] is the 0-based row index of the nav footer in step sheet i.
  */
 export async function addStepNavLinks(
   spreadsheetId: string,
   instruction: WorkInstruction,
+  stepNavRows: number[],
 ): Promise<void> {
   const token = gapi.client.getToken()?.access_token;
   if (!token) throw new Error('Google認証が必要です');
@@ -105,13 +105,14 @@ export async function addStepNavLinks(
   const mainSheet = sheetList.find((s) => s.index === 0);
   const mainGid = mainSheet ? mainSheet.sheetId : 0;
 
-  // 2. Build batchUpdate requests
+  // 2. Build batchUpdate requests using stepNavRows for exact row positions
   const requests = stepGids.map((gid, i) => {
     const isLast = i === stepGids.length - 1;
-    const label = isLast ? '↑ 概要' : '次へ →';
+    const label = isLast ? '↑ 概要へ戻る' : '次へ →';
     const targetGid = isLast ? mainGid : stepGids[i + 1];
     const targetUri = `#gid=${targetGid}&range=A1`;
-    return navRequest(gid, label, targetUri);
+    const navRowIndex = stepNavRows[i] ?? 0;
+    return navRequest(gid, navRowIndex, label, targetUri);
   });
 
   if (requests.length === 0) return;
@@ -134,3 +135,5 @@ export async function addStepNavLinks(
     throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
   }
 }
+
+export { NAV_START_COL, NAV_END_COL };
