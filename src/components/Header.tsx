@@ -31,48 +31,47 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition">
-            <span className="text-lg font-semibold tracking-tight">手順書作成システム</span>
+      <header className="bg-white/80 backdrop-blur-xl border-b border-[#d2d2d7] sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
+            <span className="text-base font-semibold text-[#1d1d1f] tracking-tight">手順書作成システム</span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-1.5">
             <button
               onClick={() => setShowHelp(true)}
-              className="px-2.5 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/10 transition"
+              className="p-2 rounded-full text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition"
               title="使い方ガイド"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
             <Link
               href="/"
-              className="px-3.5 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
+              className="px-3.5 py-1.5 rounded-full text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition"
             >
               一覧
             </Link>
             <Link
               href="/instructions/new"
-              className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium text-sm hover:from-blue-600 hover:to-indigo-600 transition shadow-sm"
+              className="px-4 py-1.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-full font-medium text-sm transition"
             >
               + 新規作成
             </Link>
-            <div className="ml-2 pl-2 border-l border-slate-700">
+            <div className="ml-1 pl-2 border-l border-[#e8e8ed]">
               <GoogleSignInButton />
             </div>
-            {/* Drive folder selector */}
             <button
               onClick={handleFolderClick}
-              className="px-3 py-1.5 rounded-lg text-sm border border-slate-600 hover:border-yellow-400 hover:bg-white/10 transition flex items-center gap-1.5 max-w-[180px]"
+              className="px-3 py-1.5 rounded-full text-sm border border-[#d2d2d7] hover:border-[#0071e3] hover:bg-black/5 transition flex items-center gap-1.5 max-w-[180px] text-[#6e6e73]"
               title={currentFolder ? `保存先: ${currentFolder.name}` : 'Driveフォルダを指定'}
             >
-              <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span className="truncate text-slate-300">
+              <span className="truncate">
                 {currentFolder ? currentFolder.name : '未設定'}
               </span>
             </button>
@@ -80,11 +79,11 @@ export default function Header() {
 
           {/* Mobile hamburger */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition"
+            className="md:hidden p-2 rounded-full hover:bg-black/5 transition text-[#1d1d1f]"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="メニュー"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {menuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
@@ -96,26 +95,26 @@ export default function Header() {
 
         {/* Mobile menu */}
         {menuOpen && (
-          <nav className="md:hidden border-t border-slate-700/50 px-4 py-3 space-y-1 bg-slate-800/50">
+          <nav className="md:hidden border-t border-[#e8e8ed] px-4 py-3 space-y-1 bg-white">
             <button
               onClick={() => { setMenuOpen(false); setShowHelp(true); }}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               使い方ガイド
             </button>
             <Link
               href="/"
-              className="block px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
+              className="block px-3 py-2.5 rounded-xl text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition"
               onClick={() => setMenuOpen(false)}
             >
               一覧
             </Link>
             <Link
               href="/instructions/new"
-              className="block px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
+              className="block px-3 py-2.5 rounded-xl text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition"
               onClick={() => setMenuOpen(false)}
             >
               + 新規作成
@@ -123,13 +122,12 @@ export default function Header() {
             <div className="px-3 py-2">
               <GoogleSignInButton />
             </div>
-            {/* Mobile Drive folder selector */}
             <button
               onClick={() => { setMenuOpen(false); handleFolderClick(); }}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/5 transition flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               <span className="truncate">
                 {currentFolder ? `フォルダ: ${currentFolder.name}` : 'Driveフォルダを指定'}
@@ -139,10 +137,7 @@ export default function Header() {
         )}
       </header>
 
-      {/* Help Modal */}
       <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
-
-      {/* Drive Folder Picker Modal */}
       <DriveFolderPicker
         open={showFolderPicker}
         onClose={() => setShowFolderPicker(false)}
