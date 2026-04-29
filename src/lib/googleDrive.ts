@@ -205,6 +205,78 @@ export async function downloadDriveFile(fileId: string): Promise<string> {
   return res.text();
 }
 
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/**
+ * Upload an XLSX buffer to Drive and convert it to native Google Sheets format.
+ * Returns the Google Sheets spreadsheet ID for subsequent Sheets API calls.
+ */
+export async function uploadAsGoogleSheet(
+  buffer: ArrayBuffer,
+  sheetName: string,
+): Promise<string> {
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) throw new Error('Google認証が必要です');
+
+  const folderId = await getTargetFolderId();
+  const escapedName = sheetName.replace(/'/g, "\\'");
+
+  // Check for existing Google Sheets file with same name
+  const existingRes = await gapi.client.request<DriveFileList>({
+    path: 'https://www.googleapis.com/drive/v3/files',
+    params: {
+      q: `name='${escapedName}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+      fields: 'files(id)',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+    },
+  });
+  const existingFileId = existingRes.result.files.length > 0 ? existingRes.result.files[0].id : null;
+
+  // Metadata: target mimeType = Google Sheets triggers conversion on Drive side
+  const metadata = existingFileId
+    ? { name: sheetName, mimeType: 'application/vnd.google-apps.spreadsheet' }
+    : { name: sheetName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [folderId] };
+
+  const initUrl = existingFileId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=resumable&supportsAllDrives=true&fields=id`
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id';
+
+  const initRes = await fetch(initUrl, {
+    method: existingFileId ? 'PATCH' : 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': XLSX_MIME,
+      'X-Upload-Content-Length': String(buffer.byteLength),
+    },
+    body: JSON.stringify(metadata),
+  });
+
+  if (!initRes.ok) {
+    const errorText = await initRes.text();
+    throw new Error(`Drive API ${initRes.status}: ${errorText}`);
+  }
+
+  const uploadUrl = initRes.headers.get('Location');
+  if (!uploadUrl) throw new Error('アップロードURLを取得できませんでした');
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': XLSX_MIME, 'Content-Length': String(buffer.byteLength) },
+    body: buffer,
+  });
+
+  if (!uploadRes.ok) {
+    const errorText = await uploadRes.text();
+    throw new Error(`Drive API ${uploadRes.status}: ${errorText}`);
+  }
+
+  const file = await uploadRes.json() as { id: string };
+  if (!file.id) throw new Error('Google SheetsファイルのIDを取得できませんでした');
+  return file.id;
+}
+
 export async function saveFileToDrive(
   buffer: ArrayBuffer,
   fileName: string,
