@@ -195,19 +195,10 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     try {
       const { buffer: excelBuffer, stepNavRows, indexNavRows } = await buildExcelBuffer(instruction, excelNavMode);
 
+      const sheetName = `${instruction.title}_手順書`;
+      const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
       if (excelNavMode === 'jump') {
-        // ステップ別シートモード: Google Sheets ネイティブ形式でアップロード後、
-        // Sheets API で「次へ」ナビゲーションリンクを挿入
-        const sheetName = `${instruction.title}_手順書`;
-        const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
         await addStepNavLinks(spreadsheetId, instruction, stepNavRows, indexNavRows);
-      } else {
-        // スクロールモード: 通常の XLSX としてアップロード
-        await saveFileToDrive(
-          excelBuffer,
-          `${instruction.title}_手順書.xlsx`,
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
       }
 
       // Upload JSON (both modes)
@@ -221,8 +212,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       const folderName = getTargetFolder()?.name || 'WorkInstructions';
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      const fileType = excelNavMode === 'jump' ? 'Google スプレッドシート' : 'Excel';
-      setSaveMessage({ text: `「${folderName}」に${fileType}・JSONを保存しました`, type: 'success' });
+      setSaveMessage({ text: `「${folderName}」にスプレッドシート・JSONを保存しました`, type: 'success' });
       setTimeout(() => router.push('/'), 1500);
     } catch (err) {
       console.error('Drive save error:', err);
@@ -501,7 +491,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           </p>
         )}
         <p className="text-xs text-slate-400 text-center">
-          「完成」を押すと、ヘッダーで指定したGoogleドライブフォルダにExcel・JSONを出力します
+          「完成」を押すと、ヘッダーで指定したGoogleドライブフォルダにスプレッドシート・JSONを出力します
         </p>
       </div>
     </form>
