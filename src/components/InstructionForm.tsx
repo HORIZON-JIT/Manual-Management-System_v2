@@ -64,7 +64,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [keywordsText, setKeywordsText] = useState(
     initialData?.keywords?.join(', ') || ''
   );
-  const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('scroll');
+  const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('jump');
 
   const handleAddStep = () => {
     setSteps([...steps, createEmptyStep(steps.length)]);
