@@ -281,14 +281,9 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     saveToFolder(instruction);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleCompleteClick();
-  };
-
   return (
     <>
-    <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <form className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">
         {isEdit ? '手順書を編集' : '新規手順書作成'}
       </h1>
@@ -507,7 +502,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             下書き保存して終了
           </button>
           <button
-            type="submit"
+            type="button"
+            onClick={handleCompleteClick}
             disabled={saving}
             className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-bold text-lg hover:from-emerald-600 hover:to-green-700 transition shadow-md disabled:opacity-50"
           >
