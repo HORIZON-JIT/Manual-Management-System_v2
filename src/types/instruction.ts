@@ -27,10 +27,20 @@ export type Category = string;
 
 export const DEFAULT_CATEGORIES = ['事務作業', '現場作業'] as const;
 
+export interface InstructionSnapshot {
+  title: string;
+  category: Category;
+  description: string;
+  steps: Step[];
+  keywords?: string[];
+  createdBy?: string;
+}
+
 export interface UpdateHistoryEntry {
   updatedBy: string;
   updatedAt: string;
   note?: string;
+  snapshot?: InstructionSnapshot;
 }
 
 export type InstructionStatus = 'draft' | 'completed';
