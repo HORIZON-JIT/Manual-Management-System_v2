@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionStatus } from '@/types/instruction';
+import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
@@ -11,6 +11,7 @@ import { addStepNavLinks } from '@/lib/sheetsNavLinks';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
+import VersionHistoryModal from './VersionHistoryModal';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
 
@@ -65,6 +66,25 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     initialData?.keywords?.join(', ') || ''
   );
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('jump');
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+
+  const hasRestorableVersions = isEdit && initialData?.updateHistory?.some(e => !!e.snapshot);
+
+  const handleRestoreVersion = (snapshot: InstructionSnapshot) => {
+    setTitle(snapshot.title);
+    setCategory(snapshot.category);
+    if (!DEFAULT_CATEGORIES.includes(snapshot.category as typeof DEFAULT_CATEGORIES[number])) {
+      setShowCustomCategory(true);
+      setCustomCategory(snapshot.category);
+    } else {
+      setShowCustomCategory(false);
+      setCustomCategory('');
+    }
+    setDescription(snapshot.description);
+    setSteps(snapshot.steps);
+    setKeywordsText(snapshot.keywords?.join(', ') || '');
+    setShowVersionHistory(false);
+  };
 
   const handleAddStep = () => {
     setSteps([...steps, createEmptyStep(steps.length)]);
@@ -122,9 +142,18 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
     let updateHistory: UpdateHistoryEntry[] = initialData?.updateHistory || [];
     if (isEdit && trimmedName && addHistory) {
+      const snapshot: InstructionSnapshot = {
+        title: initialData!.title,
+        category: initialData!.category,
+        description: initialData!.description,
+        steps: initialData!.steps,
+        keywords: initialData!.keywords,
+        createdBy: initialData!.createdBy,
+      };
       const entry: UpdateHistoryEntry = {
         updatedBy: trimmedName,
         updatedAt: now,
+        snapshot,
       };
       if (updateNote.trim()) {
         entry.note = updateNote.trim();
@@ -366,6 +395,15 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                 placeholder="例: ステップ3の手順を大幅変更"
               />
             )}
+            {hasRestorableVersions && (
+              <button
+                type="button"
+                onClick={() => setShowVersionHistory(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                過去のバージョンを確認
+              </button>
+            )}
           </div>
         )}
 
@@ -533,6 +571,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           </button>
         </div>
       </div>
+    )}
+
+    {showVersionHistory && initialData?.updateHistory && (
+      <VersionHistoryModal
+        history={initialData.updateHistory}
+        onRestore={handleRestoreVersion}
+        onClose={() => setShowVersionHistory(false)}
+      />
     )}
     </>
   );
