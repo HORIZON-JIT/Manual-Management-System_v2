@@ -440,7 +440,10 @@ function InstructionViewContent() {
                         }}
                         className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className={`text-sm ${checkStates[step.id]?.[item.id] ? 'text-blue-400 line-through' : 'text-blue-800'}`}>
+                      <span
+                        className="text-sm text-blue-800"
+                        style={checkStates[step.id]?.[item.id] ? { textDecoration: 'line-through', opacity: 0.5 } : undefined}
+                      >
                         {item.label}
                       </span>
                     </label>
