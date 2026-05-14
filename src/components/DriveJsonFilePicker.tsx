@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DriveFileInfo, getTargetFolder, listJsonFilesInFolder, downloadDriveFile } from '@/lib/googleDrive';
+import { getViewPageBaseUrl } from '@/lib/shareLink';
 
 interface DriveJsonFilePickerProps {
   open: boolean;
@@ -15,6 +16,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState<string>('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -92,11 +94,11 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
           ) : (
             <ul className="space-y-1">
               {files.map((file) => (
-                <li key={file.id}>
+                <li key={file.id} className="flex items-center gap-1">
                   <button
                     onClick={() => handleFileSelect(file)}
                     disabled={downloading !== null}
-                    className="w-full text-left px-3 py-3 rounded-lg hover:bg-emerald-50 flex items-center gap-3 text-sm transition disabled:opacity-50"
+                    className="flex-1 text-left px-3 py-3 rounded-lg hover:bg-emerald-50 flex items-center gap-3 text-sm transition disabled:opacity-50 min-w-0"
                   >
                     <span className="text-emerald-500 text-lg shrink-0">
                       {downloading === file.id ? (
@@ -106,6 +108,23 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                       )}
                     </span>
                     <span className="text-gray-700 truncate">{file.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${getViewPageBaseUrl()}?driveFileId=${file.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedId(file.id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className="shrink-0 px-2 py-1.5 text-xs rounded-md border transition"
+                    style={copiedId === file.id
+                      ? { backgroundColor: '#dcfce7', borderColor: '#86efac', color: '#166534' }
+                      : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb' }
+                    }
+                    title="閲覧リンクをコピー"
+                  >
+                    {copiedId === file.id ? 'コピー済' : 'URLコピー'}
                   </button>
                 </li>
               ))}
