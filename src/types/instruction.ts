@@ -64,6 +64,7 @@ export interface WorkInstruction {
   updateHistory?: UpdateHistoryEntry[];
   status?: InstructionStatus;
   keywords?: string[];
+  driveFileId?: string;
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

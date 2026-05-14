@@ -281,7 +281,7 @@ export async function saveFileToDrive(
   buffer: ArrayBuffer,
   fileName: string,
   mimeType: string,
-): Promise<void> {
+): Promise<string> {
   const token = gapi.client.getToken()?.access_token;
   if (!token) throw new Error('Google認証が必要です');
 
@@ -305,9 +305,10 @@ export async function saveFileToDrive(
     : { name: fileName, mimeType, parents: [folderId] };
 
   // Use resumable upload for reliability with large files
+  // For new files, include fields=id so the upload response returns the file ID
   const initUrl = existingFileId
     ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=resumable&supportsAllDrives=true`
-    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true';
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id';
 
   const initRes = await fetch(initUrl, {
     method: existingFileId ? 'PATCH' : 'POST',
@@ -341,6 +342,11 @@ export async function saveFileToDrive(
     const errorText = await uploadRes.text();
     throw new Error(`Drive API ${uploadRes.status}: ${errorText}`);
   }
+
+  if (existingFileId) return existingFileId;
+  const result = await uploadRes.json() as { id: string };
+  if (!result.id) throw new Error('ファイルIDを取得できませんでした');
+  return result.id;
 }
 
 export async function saveInstructionsToDrive(
