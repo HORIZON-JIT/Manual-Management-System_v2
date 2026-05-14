@@ -161,10 +161,16 @@ const solidFill = (color: string): ExcelJS.Fill => ({
 
 export type ExcelNavMode = 'scroll' | 'jump';
 
+export interface CheckboxCell {
+  sheetName: string;
+  row: number;  // 0-based row index
+}
+
 export interface ExcelBuildResult {
   buffer: ArrayBuffer;
   stepNavRows: number[];   // 0-based row index of nav footer in each step sheet (jump mode only)
   indexNavRows: number[];  // 0-based row index of each "→ 開く" button on main sheet (jump mode only)
+  checkboxCells: CheckboxCell[];  // positions of check item cells for Sheets API
 }
 
 export async function exportToExcel(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<void> {
@@ -271,6 +277,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const stepNavRows: number[] = [];  // 0-based row index of nav footer per step sheet
   const indexNavRows: number[] = [];  // 0-based row index of index buttons on main sheet
+  const checkboxCells: CheckboxCell[] = [];
   const mainSheetRowBeforeSteps = row;  // save row for main sheet (jump mode resets row)
 
   // Column definitions for reuse when creating per-step sheets
@@ -404,6 +411,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         labelCell.fill = solidFill(C.grayLight);
         labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
         setBoxBorder(labelCell);
+
+        checkboxCells.push({ sheetName: sws.name, row: row - 1 });
 
         mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, item.label, {
           font: { size: 11, color: { argb: C.dark } },
@@ -737,7 +746,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   }
 
   const buffer = await wb.xlsx.writeBuffer();
-  return { buffer: buffer as ArrayBuffer, stepNavRows, indexNavRows };
+  return { buffer: buffer as ArrayBuffer, stepNavRows, indexNavRows, checkboxCells };
 }
 
 // ============================================================
