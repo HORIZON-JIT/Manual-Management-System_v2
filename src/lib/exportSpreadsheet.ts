@@ -396,32 +396,6 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       row++;
     }
 
-    // --- Check items ---
-    if (step.checkItems && step.checkItems.length > 0) {
-      for (const item of step.checkItems) {
-        sws.getRow(row).height = 22;
-
-        const aCell = sws.getCell(row, 1);
-        aCell.fill = solidFill(C.primary);
-        setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
-
-        const labelCell = sws.getCell(row, 2);
-        labelCell.value = '☐';
-        labelCell.font = { name: 'Arial', size: 12, color: { argb: C.dark } };
-        labelCell.fill = solidFill(C.grayLight);
-        labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        setBoxBorder(labelCell);
-
-        checkboxCells.push({ sheetName: sws.name, row: row - 1 });
-
-        mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, item.label, {
-          font: { size: 11, color: { argb: C.dark } },
-          fill: solidFill(C.grayLight),
-        });
-        row++;
-      }
-    }
-
     // --- Images ---
     const stepImages = getStepImages(step);
     for (let imgIdx = 0; imgIdx < stepImages.length; imgIdx++) {
@@ -540,6 +514,32 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         hyperlink: step.videoUrl,
       } as ExcelJS.CellHyperlinkValue;
       row++;
+    }
+
+    // --- Check items ---
+    if (step.checkItems && step.checkItems.length > 0) {
+      for (const item of step.checkItems) {
+        sws.getRow(row).height = 22;
+
+        const aCell = sws.getCell(row, 1);
+        aCell.fill = solidFill(C.primary);
+        setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
+
+        const labelCell = sws.getCell(row, 2);
+        labelCell.value = '☐';
+        labelCell.font = { name: 'Arial', size: 12, color: { argb: C.dark } };
+        labelCell.fill = solidFill(C.grayLight);
+        labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        setBoxBorder(labelCell);
+
+        checkboxCells.push({ sheetName: sws.name, row: row - 1 });
+
+        mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, item.label, {
+          font: { size: 11, color: { argb: C.dark } },
+          fill: solidFill(C.grayLight),
+        });
+        row++;
+      }
     }
 
     // Nav footer row at the bottom of each step sheet (jump mode only)

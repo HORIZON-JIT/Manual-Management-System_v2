@@ -208,49 +208,6 @@ export default function StepEditor({
           />
         </div>
 
-        {/* Check items */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            チェック項目（任意）
-          </label>
-          {(step.checkItems ?? []).map((item, ci) => (
-            <div key={item.id} className="flex items-center gap-2 mb-1.5">
-              <span className="text-gray-400 text-sm">☐</span>
-              <input
-                type="text"
-                value={item.label}
-                onChange={(e) => {
-                  const updated = [...(step.checkItems ?? [])];
-                  updated[ci] = { ...item, label: e.target.value };
-                  onChange({ ...step, checkItems: updated });
-                }}
-                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="チェック項目名を入力"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = (step.checkItems ?? []).filter((_, i) => i !== ci);
-                  onChange({ ...step, checkItems: updated.length > 0 ? updated : undefined });
-                }}
-                className="text-red-400 hover:text-red-600 text-sm px-1"
-              >
-                &times;
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              const newItem: CheckItem = { id: uuidv4(), label: '' };
-              onChange({ ...step, checkItems: [...(step.checkItems ?? []), newItem] });
-            }}
-            className="text-sm text-blue-600 hover:text-blue-800 mt-1"
-          >
-            + チェック項目を追加
-          </button>
-        </div>
-
         {/* Image section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -339,6 +296,49 @@ export default function StepEditor({
             className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             placeholder="https://www.youtube.com/watch?v=..."
           />
+        </div>
+
+        {/* Check items */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            チェック項目（任意）
+          </label>
+          {(step.checkItems ?? []).map((item, ci) => (
+            <div key={item.id} className="flex items-center gap-2 mb-1.5">
+              <span className="text-gray-400 text-sm">☐</span>
+              <input
+                type="text"
+                value={item.label}
+                onChange={(e) => {
+                  const updated = [...(step.checkItems ?? [])];
+                  updated[ci] = { ...item, label: e.target.value };
+                  onChange({ ...step, checkItems: updated });
+                }}
+                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="チェック項目名を入力"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = (step.checkItems ?? []).filter((_, i) => i !== ci);
+                  onChange({ ...step, checkItems: updated.length > 0 ? updated : undefined });
+                }}
+                className="text-red-400 hover:text-red-600 text-sm px-1"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const newItem: CheckItem = { id: uuidv4(), label: '' };
+              onChange({ ...step, checkItems: [...(step.checkItems ?? []), newItem] });
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800 mt-1"
+          >
+            + チェック項目を追加
+          </button>
         </div>
       </div>
     </div>
