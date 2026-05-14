@@ -54,6 +54,8 @@ function InstructionViewContent() {
   }, [driveMessage]);
 
   useEffect(() => {
+    setCheckStates({});
+
     // Priority 1: shared data in hash fragment
     if (window.location.hash) {
       const shared = parseShareData(window.location.hash);

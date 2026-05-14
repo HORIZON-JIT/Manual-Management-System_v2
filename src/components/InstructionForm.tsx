@@ -283,7 +283,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   return (
     <>
-    <form className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <form className="max-w-3xl mx-auto px-4 py-6 space-y-6" onSubmit={(e) => e.preventDefault()}>
       <h1 className="text-2xl font-bold text-gray-800">
         {isEdit ? '手順書を編集' : '新規手順書作成'}
       </h1>
