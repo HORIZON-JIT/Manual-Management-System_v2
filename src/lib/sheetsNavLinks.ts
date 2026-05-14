@@ -226,3 +226,122 @@ export async function addSheetCheckboxes(
     throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
   }
 }
+
+const SCRIPT_ID_KEY = 'sheets_reset_script_ids';
+
+function getStoredScriptId(spreadsheetId: string): string | null {
+  try {
+    const stored = localStorage.getItem(SCRIPT_ID_KEY);
+    const map: Record<string, string> = stored ? JSON.parse(stored) : {};
+    return map[spreadsheetId] ?? null;
+  } catch { return null; }
+}
+
+function storeScriptId(spreadsheetId: string, scriptId: string): void {
+  try {
+    const stored = localStorage.getItem(SCRIPT_ID_KEY);
+    const map: Record<string, string> = stored ? JSON.parse(stored) : {};
+    map[spreadsheetId] = scriptId;
+    localStorage.setItem(SCRIPT_ID_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
+const RESET_SCRIPT_SOURCE = `
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('チェックリスト')
+    .addItem('チェックをリセット', 'resetCheckboxes')
+    .addToUi();
+}
+
+function resetCheckboxes() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+    var range = sheet.getDataRange();
+    var numRows = range.getNumRows();
+    var numCols = range.getNumColumns();
+    if (numRows === 0 || numCols === 0) continue;
+    var validations = range.getDataValidations();
+    var values = range.getValues();
+    var changed = false;
+    for (var r = 0; r < numRows; r++) {
+      for (var c = 0; c < numCols; c++) {
+        var v = validations[r][c];
+        if (v !== null) {
+          try {
+            if (v.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.CHECKBOX) {
+              values[r][c] = false;
+              changed = true;
+            }
+          } catch(e) {}
+        }
+      }
+    }
+    if (changed) range.setValues(values);
+  }
+  ss.toast('チェックをリセットしました', '完了', 3);
+}
+`.trim();
+
+const APPSSCRIPT_MANIFEST = JSON.stringify({
+  timeZone: 'Asia/Tokyo',
+  dependencies: {},
+  exceptionLogging: 'STACKDRIVER',
+  runtimeVersion: 'V8',
+});
+
+/**
+ * Attach (or update) a bound Apps Script to the spreadsheet that adds a
+ * "チェックリスト > チェックをリセット" menu item.
+ * Requires the script.projects OAuth scope.
+ * Errors are silently swallowed so a script failure does not block the save.
+ */
+export async function addResetScript(spreadsheetId: string): Promise<void> {
+  try {
+    const token = gapi.client.getToken()?.access_token;
+    if (!token) return;
+
+    const existingScriptId = getStoredScriptId(spreadsheetId);
+    const scriptContent = {
+      files: [
+        { name: 'Code', type: 'SERVER_JS', source: RESET_SCRIPT_SOURCE },
+        { name: 'appsscript', type: 'JSON', source: APPSSCRIPT_MANIFEST },
+      ],
+    };
+
+    if (existingScriptId) {
+      const res = await fetch(
+        `https://script.googleapis.com/v1/projects/${existingScriptId}/content`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(scriptContent),
+        },
+      );
+      if (res.ok) return;
+    }
+
+    const createRes = await fetch('https://script.googleapis.com/v1/projects', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'チェックリストリセット', parentId: spreadsheetId }),
+    });
+    if (!createRes.ok) return;
+
+    const project = await createRes.json() as { scriptId: string };
+    const scriptId = project.scriptId;
+    if (!scriptId) return;
+
+    storeScriptId(spreadsheetId, scriptId);
+
+    await fetch(`https://script.googleapis.com/v1/projects/${scriptId}/content`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(scriptContent),
+    });
+  } catch {
+    // Non-critical: Apps Script attachment failure should not block save
+  }
+}
