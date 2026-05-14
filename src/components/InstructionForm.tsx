@@ -7,7 +7,7 @@ import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, Instruct
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
-import { addStepNavLinks, addSheetCheckboxes, addResetScript, RESET_SCRIPT_SOURCE } from '@/lib/sheetsNavLinks';
+import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -184,7 +184,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'error'; folderUrl?: string } | null>(null);
-  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string; showResetScript?: boolean; scriptAutoAttached?: boolean } | null>(null);
+  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string } | null>(null);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -251,7 +251,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         : undefined;
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveSuccessModal({ folderName, folderUrl, showResetScript: checkboxCells.length > 0, scriptAutoAttached: scriptAttached });
+      setSaveSuccessModal({ folderName, folderUrl });
+      void scriptAttached;
     } catch (err) {
       console.error('Drive save error:', err);
       const msg = err instanceof Error
@@ -540,7 +541,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
     {saveSuccessModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className={`bg-white rounded-2xl shadow-xl p-8 w-full mx-4 flex flex-col items-center gap-5 ${saveSuccessModal.showResetScript ? 'max-w-lg' : 'max-w-sm'}`}>
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-5">
           <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
             <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -564,42 +565,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               )}
             </p>
           </div>
-          {saveSuccessModal.showResetScript && (
-            <div className={`w-full ${saveSuccessModal.scriptAutoAttached ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'} border rounded-xl p-4 text-left space-y-2`}>
-              <p className={`text-sm font-bold ${saveSuccessModal.scriptAutoAttached ? 'text-blue-800' : 'text-amber-800'}`}>
-                チェックボックス自動リセットスクリプト
-              </p>
-              {saveSuccessModal.scriptAutoAttached ? (
-                <p className="text-xs text-blue-700">
-                  スプレッドシートを開くたびにチェックボックスが自動リセットされるスクリプトを設定済みです。手動で確認・編集する場合は「拡張機能」→「Apps Script」から以下のコードを確認できます。
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs text-amber-700">
-                    自動設定に失敗しました。以下の手順でスクリプトを手動設定してください：
-                  </p>
-                  <ol className="text-xs text-amber-700 list-decimal list-inside space-y-1">
-                    <li>スプレッドシートを開く</li>
-                    <li>メニュー「拡張機能」→「Apps Script」を選択</li>
-                    <li>既存のコードを全て削除し、以下を貼り付け</li>
-                    <li>保存ボタンをクリック</li>
-                  </ol>
-                </>
-              )}
-              <div className="relative">
-                <pre className="bg-gray-900 text-green-300 text-xs p-3 rounded-lg overflow-x-auto max-h-40 overflow-y-auto whitespace-pre">{RESET_SCRIPT_SOURCE}</pre>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(RESET_SCRIPT_SOURCE);
-                  }}
-                  className="absolute top-2 right-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition"
-                >
-                  コピー
-                </button>
-              </div>
-            </div>
-          )}
           <button
             onClick={() => router.push('/')}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition"
