@@ -1,3 +1,8 @@
+export interface CheckItem {
+  id: string;
+  label: string;
+}
+
 export interface Step {
   id: string;
   orderIndex: number;
@@ -9,6 +14,7 @@ export interface Step {
   imageCaptions?: string[];
   videoUrl?: string;
   caution?: string;
+  checkItems?: CheckItem[];
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
