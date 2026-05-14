@@ -246,32 +246,21 @@ function storeScriptId(spreadsheetId: string, scriptId: string): void {
   } catch { /* ignore */ }
 }
 
-const RESET_SCRIPT_SOURCE = `
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('チェックリスト')
-    .addItem('チェックをリセット', 'resetCheckboxes')
-    .addToUi();
-}
-
-function resetCheckboxes() {
+export const RESET_SCRIPT_SOURCE = `function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheets = ss.getSheets();
   for (var i = 0; i < sheets.length; i++) {
     var sheet = sheets[i];
     var range = sheet.getDataRange();
-    var numRows = range.getNumRows();
-    var numCols = range.getNumColumns();
-    if (numRows === 0 || numCols === 0) continue;
+    if (range.getNumRows() === 0 || range.getNumColumns() === 0) continue;
     var validations = range.getDataValidations();
     var values = range.getValues();
     var changed = false;
-    for (var r = 0; r < numRows; r++) {
-      for (var c = 0; c < numCols; c++) {
-        var v = validations[r][c];
-        if (v !== null) {
+    for (var r = 0; r < validations.length; r++) {
+      for (var c = 0; c < validations[r].length; c++) {
+        if (validations[r][c] !== null) {
           try {
-            if (v.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.CHECKBOX) {
+            if (validations[r][c].getCriteriaType() === SpreadsheetApp.DataValidationCriteria.CHECKBOX) {
               values[r][c] = false;
               changed = true;
             }
@@ -281,9 +270,7 @@ function resetCheckboxes() {
     }
     if (changed) range.setValues(values);
   }
-  ss.toast('チェックをリセットしました', '完了', 3);
-}
-`.trim();
+}`;
 
 const APPSSCRIPT_MANIFEST = JSON.stringify({
   timeZone: 'Asia/Tokyo',
@@ -293,24 +280,23 @@ const APPSSCRIPT_MANIFEST = JSON.stringify({
 });
 
 /**
- * Attach (or update) a bound Apps Script to the spreadsheet that adds a
- * "チェックリスト > チェックをリセット" menu item.
- * Requires the script.projects OAuth scope.
- * Errors are silently swallowed so a script failure does not block the save.
+ * Attach a bound Apps Script that auto-resets checkboxes on open.
+ * Returns true if successful, false if the API call failed
+ * (e.g. Apps Script API not enabled in Cloud Console).
  */
-export async function addResetScript(spreadsheetId: string): Promise<void> {
+export async function addResetScript(spreadsheetId: string): Promise<boolean> {
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) return false;
+
+  const existingScriptId = getStoredScriptId(spreadsheetId);
+  const scriptContent = {
+    files: [
+      { name: 'Code', type: 'SERVER_JS', source: RESET_SCRIPT_SOURCE },
+      { name: 'appsscript', type: 'JSON', source: APPSSCRIPT_MANIFEST },
+    ],
+  };
+
   try {
-    const token = gapi.client.getToken()?.access_token;
-    if (!token) return;
-
-    const existingScriptId = getStoredScriptId(spreadsheetId);
-    const scriptContent = {
-      files: [
-        { name: 'Code', type: 'SERVER_JS', source: RESET_SCRIPT_SOURCE },
-        { name: 'appsscript', type: 'JSON', source: APPSSCRIPT_MANIFEST },
-      ],
-    };
-
     if (existingScriptId) {
       const res = await fetch(
         `https://script.googleapis.com/v1/projects/${existingScriptId}/content`,
@@ -320,7 +306,7 @@ export async function addResetScript(spreadsheetId: string): Promise<void> {
           body: JSON.stringify(scriptContent),
         },
       );
-      if (res.ok) return;
+      if (res.ok) return true;
     }
 
     const createRes = await fetch('https://script.googleapis.com/v1/projects', {
@@ -328,20 +314,24 @@ export async function addResetScript(spreadsheetId: string): Promise<void> {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'チェックリストリセット', parentId: spreadsheetId }),
     });
-    if (!createRes.ok) return;
+    if (!createRes.ok) return false;
 
     const project = await createRes.json() as { scriptId: string };
     const scriptId = project.scriptId;
-    if (!scriptId) return;
+    if (!scriptId) return false;
 
     storeScriptId(spreadsheetId, scriptId);
 
-    await fetch(`https://script.googleapis.com/v1/projects/${scriptId}/content`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(scriptContent),
-    });
+    const contentRes = await fetch(
+      `https://script.googleapis.com/v1/projects/${scriptId}/content`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(scriptContent),
+      },
+    );
+    return contentRes.ok;
   } catch {
-    // Non-critical: Apps Script attachment failure should not block save
+    return false;
   }
 }
