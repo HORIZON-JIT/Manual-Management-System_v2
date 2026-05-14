@@ -1,4 +1,5 @@
 import { WorkInstruction } from '@/types/instruction';
+import { CheckboxCell } from '@/lib/exportSpreadsheet';
 
 interface SheetProperties {
   sheetId: number;
@@ -8,6 +9,19 @@ interface SheetProperties {
 
 interface SheetsGetResponse {
   sheets: { properties: SheetProperties }[];
+}
+
+async function getSheetList(spreadsheetId: string, token: string): Promise<SheetProperties[]> {
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Sheets API ${res.status}: ${err}`);
+  }
+  const data = await res.json() as SheetsGetResponse;
+  return data.sheets.map((s) => s.properties);
 }
 
 /** Build the tab name for a step (must match exportSpreadsheet.ts logic) */
@@ -83,16 +97,7 @@ export async function addStepNavLinks(
   if (!token) throw new Error('Google認証が必要です');
 
   // 1. Get all sheets with their gids
-  const getRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!getRes.ok) {
-    const err = await getRes.text();
-    throw new Error(`Sheets API ${getRes.status}: ${err}`);
-  }
-  const sheetsData = await getRes.json() as SheetsGetResponse;
-  const sheetList = sheetsData.sheets.map((s) => s.properties);
+  const sheetList = await getSheetList(spreadsheetId, token);
 
   // Build expected tab names for each step
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -140,6 +145,70 @@ export async function addStepNavLinks(
   if (requests.length === 0) return;
 
   // 3. Apply batchUpdate
+  const updateRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests }),
+    },
+  );
+
+  if (!updateRes.ok) {
+    const err = await updateRes.text();
+    throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
+  }
+}
+
+/**
+ * Convert ☐ text cells to interactive Google Sheets checkboxes.
+ */
+export async function addSheetCheckboxes(
+  spreadsheetId: string,
+  checkboxCells: CheckboxCell[],
+): Promise<void> {
+  if (checkboxCells.length === 0) return;
+
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) throw new Error('Google認証が必要です');
+
+  const sheetList = await getSheetList(spreadsheetId, token);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requests: any[] = [];
+
+  for (const cell of checkboxCells) {
+    const sheet = sheetList.find((s) => s.title === cell.sheetName);
+    if (!sheet) continue;
+
+    requests.push({
+      updateCells: {
+        range: {
+          sheetId: sheet.sheetId,
+          startRowIndex: cell.row,
+          endRowIndex: cell.row + 1,
+          startColumnIndex: 1,
+          endColumnIndex: 2,
+        },
+        rows: [{
+          values: [{
+            userEnteredValue: { boolValue: false },
+            dataValidation: {
+              condition: { type: 'BOOLEAN' },
+              showCustomUi: true,
+            },
+          }],
+        }],
+        fields: 'userEnteredValue,dataValidation',
+      },
+    });
+  }
+
+  if (requests.length === 0) return;
+
   const updateRes = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
     {

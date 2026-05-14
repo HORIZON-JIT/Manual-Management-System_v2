@@ -7,7 +7,7 @@ import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, Instruct
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
-import { addStepNavLinks } from '@/lib/sheetsNavLinks';
+import { addStepNavLinks, addSheetCheckboxes } from '@/lib/sheetsNavLinks';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -223,12 +223,15 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     setSaving(true);
     setSaveMessage(null);
     try {
-      const { buffer: excelBuffer, stepNavRows, indexNavRows } = await buildExcelBuffer(instruction, excelNavMode);
+      const { buffer: excelBuffer, stepNavRows, indexNavRows, checkboxCells } = await buildExcelBuffer(instruction, excelNavMode);
 
       const sheetName = `${instruction.title}_手順書`;
       const spreadsheetId = await uploadAsGoogleSheet(excelBuffer, sheetName);
       if (excelNavMode === 'jump') {
         await addStepNavLinks(spreadsheetId, instruction, stepNavRows, indexNavRows);
+      }
+      if (checkboxCells.length > 0) {
+        await addSheetCheckboxes(spreadsheetId, checkboxCells);
       }
 
       // Upload JSON (both modes)
