@@ -184,7 +184,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'error'; folderUrl?: string } | null>(null);
-  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string; showResetScript?: boolean } | null>(null);
+  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string; showResetScript?: boolean; scriptAutoAttached?: boolean } | null>(null);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -251,7 +251,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         : undefined;
       // ローカルストレージのステータスも completed に更新（下書き残留を防止）
       try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveSuccessModal({ folderName, folderUrl, showResetScript: checkboxCells.length > 0 && !scriptAttached });
+      setSaveSuccessModal({ folderName, folderUrl, showResetScript: checkboxCells.length > 0, scriptAutoAttached: scriptAttached });
     } catch (err) {
       console.error('Drive save error:', err);
       const msg = err instanceof Error
@@ -565,19 +565,27 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             </p>
           </div>
           {saveSuccessModal.showResetScript && (
-            <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 text-left space-y-2">
-              <p className="text-sm font-bold text-amber-800">
-                チェックボックス自動リセットの設定
+            <div className={`w-full ${saveSuccessModal.scriptAutoAttached ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'} border rounded-xl p-4 text-left space-y-2`}>
+              <p className={`text-sm font-bold ${saveSuccessModal.scriptAutoAttached ? 'text-blue-800' : 'text-amber-800'}`}>
+                チェックボックス自動リセットスクリプト
               </p>
-              <p className="text-xs text-amber-700">
-                スプレッドシートを開くたびにチェックボックスを自動リセットするには、以下のスクリプトを手動で設定してください：
-              </p>
-              <ol className="text-xs text-amber-700 list-decimal list-inside space-y-1">
-                <li>スプレッドシートを開く</li>
-                <li>メニュー「拡張機能」→「Apps Script」を選択</li>
-                <li>既存のコードを全て削除し、以下を貼り付け</li>
-                <li>保存ボタン（💾）をクリック</li>
-              </ol>
+              {saveSuccessModal.scriptAutoAttached ? (
+                <p className="text-xs text-blue-700">
+                  スプレッドシートを開くたびにチェックボックスが自動リセットされるスクリプトを設定済みです。手動で確認・編集する場合は「拡張機能」→「Apps Script」から以下のコードを確認できます。
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-amber-700">
+                    自動設定に失敗しました。以下の手順でスクリプトを手動設定してください：
+                  </p>
+                  <ol className="text-xs text-amber-700 list-decimal list-inside space-y-1">
+                    <li>スプレッドシートを開く</li>
+                    <li>メニュー「拡張機能」→「Apps Script」を選択</li>
+                    <li>既存のコードを全て削除し、以下を貼り付け</li>
+                    <li>保存ボタンをクリック</li>
+                  </ol>
+                </>
+              )}
               <div className="relative">
                 <pre className="bg-gray-900 text-green-300 text-xs p-3 rounded-lg overflow-x-auto max-h-40 overflow-y-auto whitespace-pre">{RESET_SCRIPT_SOURCE}</pre>
                 <button
