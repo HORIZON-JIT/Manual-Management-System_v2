@@ -4,13 +4,9 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
-import { getInstruction, deleteInstruction, importInstruction } from '@/lib/storage';
-import { exportToPdf, buildPdfBuffer } from '@/lib/exportPdf';
-import { exportToExcel, buildExcelBuffer } from '@/lib/exportSpreadsheet';
-import { exportToWord } from '@/lib/exportWord';
-import { generateShareUrl, parseShareData, getViewPageBaseUrl, ShareResult } from '@/lib/shareLink';
-import ShareLinkModal from '@/components/ShareLinkModal';
-import { saveFileToDrive, getTargetFolder, downloadDriveFile } from '@/lib/googleDrive';
+import { getInstruction, importInstruction } from '@/lib/storage';
+import { parseShareData } from '@/lib/shareLink';
+import { downloadDriveFile } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
 
@@ -36,22 +32,13 @@ function InstructionViewContent() {
   const [loading, setLoading] = useState(true);
   const [isSharedView, setIsSharedView] = useState(false);
   const [isPreviewView, setIsPreviewView] = useState(false);
-  const [shareResult, setShareResult] = useState<ShareResult | null>(null);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
-  const [driveSaving, setDriveSaving] = useState(false);
-  const [driveMessage, setDriveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
     return addAuthListener(setAuth);
   }, []);
-
-  useEffect(() => {
-    if (!driveMessage) return;
-    const timer = setTimeout(() => setDriveMessage(null), 3000);
-    return () => clearTimeout(timer);
-  }, [driveMessage]);
 
   useEffect(() => {
     setCheckStates({});
@@ -109,81 +96,13 @@ function InstructionViewContent() {
     setLoading(false);
   }, [searchParams, auth.isSignedIn]);
 
-  const handleDelete = () => {
-    if (!instruction) return;
-    if (!confirm(`「${instruction.title}」を削除しますか？`)) return;
-    deleteInstruction(instruction.id);
-    router.push('/');
-  };
-
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleShare = () => {
-    if (!instruction) return;
-    const baseUrl = getViewPageBaseUrl();
-    const result = generateShareUrl(instruction, baseUrl);
-    setShareResult(result);
-  };
-
-  const handlePdfToDrive = async () => {
-    if (!instruction) return;
-    setDriveSaving(true);
-    setDriveMessage(null);
-    try {
-      const buffer = await buildPdfBuffer(instruction);
-      const fileName = `${instruction.title}.pdf`;
-      await saveFileToDrive(buffer, fileName, 'application/pdf');
-      const folderName = getTargetFolder()?.name || 'WorkInstructions';
-      setDriveMessage({ text: `「${folderName}」に保存しました`, type: 'success' });
-    } catch (err) {
-      console.error('Drive PDF save error:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setDriveMessage({ text: `Driveへの保存に失敗しました: ${msg}`, type: 'error' });
-    } finally {
-      setDriveSaving(false);
-    }
-  };
-
-  const handlePdfExport = async () => {
-    if (!instruction) return;
-    setDriveMessage(null);
-    try {
-      await exportToPdf(instruction);
-    } catch (err) {
-      console.error('PDF export error:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setDriveMessage({ text: `PDF出力に失敗しました: ${msg}`, type: 'error' });
-    }
-  };
-
-  const handleExcelToDrive = async () => {
-    if (!instruction) return;
-    setDriveSaving(true);
-    try {
-      const { buffer } = await buildExcelBuffer(instruction);
-      const fileName = `${instruction.title}_手順書.xlsx`;
-      await saveFileToDrive(
-        buffer,
-        fileName,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      const folderName = getTargetFolder()?.name || 'WorkInstructions';
-      setDriveMessage({ text: `「${folderName}」に保存しました`, type: 'success' });
-    } catch (err) {
-      console.error('Drive Excel save error:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setDriveMessage({ text: `Driveへの保存に失敗しました: ${msg}`, type: 'error' });
-    } finally {
-      setDriveSaving(false);
-    }
   };
 
   const handleImport = () => {
     if (!instruction) return;
     const newId = importInstruction(instruction);
-    // Navigate to the local copy
     window.location.hash = '';
     router.push(`/instructions/view?id=${newId}`);
   };
@@ -277,70 +196,17 @@ function InstructionViewContent() {
             >
               印刷
             </button>
-            <button
-              onClick={handlePdfExport}
-              className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-sm hover:bg-rose-100 transition"
-            >
-              PDF出力
-            </button>
-            {isGoogleConfigured() && auth.isSignedIn && (
-              <button
-                onClick={handlePdfToDrive}
-                disabled={driveSaving}
-                className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm hover:bg-amber-100 transition disabled:opacity-50"
-              >
-                {driveSaving ? '保存中...' : 'PDFをDriveに保存'}
-              </button>
-            )}
-            <button
-              onClick={() => exportToExcel(instruction)}
-              className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-lg text-sm hover:bg-emerald-100 transition"
-            >
-              Excel出力
-            </button>
-            {isGoogleConfigured() && auth.isSignedIn && (
-              <button
-                onClick={handleExcelToDrive}
-                disabled={driveSaving}
-                className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm hover:bg-amber-100 transition disabled:opacity-50"
-              >
-                {driveSaving ? '保存中...' : 'ExcelをDriveに保存'}
-              </button>
-            )}
-            <button
-              onClick={() => exportToWord(instruction)}
-              className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-lg text-sm hover:bg-blue-100 transition"
-            >
-              Word出力
-            </button>
           </>
         )}
         {!isSharedView && !isPreviewView && (
           <>
-            <button
-              onClick={handleShare}
-              className="px-3 py-1.5 bg-violet-50 border border-violet-200 text-violet-600 rounded-lg text-sm hover:bg-violet-100 transition"
-            >
-              共有リンク生成
-            </button>
             <Link
               href={`/instructions/edit?id=${instruction.id}`}
               className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm hover:from-blue-600 hover:to-indigo-600 transition shadow-sm"
             >
               編集
             </Link>
-            <button
-              onClick={handleDelete}
-              className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition"
-            >
-              削除
-            </button>
           </>
-        )}
-        {driveMessage && (
-          <span className={`text-sm ${driveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {driveMessage.text}
-          </span>
         )}
       </div>
 
@@ -493,14 +359,6 @@ function InstructionViewContent() {
         ))}
       </div>
 
-      {/* Share Link Modal */}
-      {shareResult && (
-        <ShareLinkModal
-          url={shareResult.url}
-          imagesIncluded={shareResult.imagesIncluded}
-          onClose={() => setShareResult(null)}
-        />
-      )}
     </div>
   );
 }
