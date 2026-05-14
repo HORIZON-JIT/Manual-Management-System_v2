@@ -8,6 +8,7 @@ import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
+import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -251,7 +252,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         ? `https://drive.google.com/drive/folders/${targetFolder.id}`
         : undefined;
       // 閲覧リンク生成
-      const viewUrl = `${window.location.origin}/instructions/view?driveFileId=${driveFileId}`;
+      const viewUrl = `${getViewPageBaseUrl()}?driveFileId=${driveFileId}`;
       // driveFileId を instruction に保存してローカルストレージを更新
       const instructionWithDriveId = { ...instruction, driveFileId };
       try { saveInstruction(instructionWithDriveId); } catch { /* Drive保存は成功しているので無視 */ }
