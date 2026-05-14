@@ -40,6 +40,7 @@ function InstructionViewContent() {
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [driveSaving, setDriveSaving] = useState(false);
   const [driveMessage, setDriveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -415,6 +416,33 @@ function InstructionViewContent() {
                     </svg>
                     注意: {step.caution}
                   </p>
+                </div>
+              )}
+
+              {step.checkItems && step.checkItems.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 space-y-2">
+                  <p className="text-xs font-medium text-blue-700 mb-1">チェック項目</p>
+                  {step.checkItems.map((item) => (
+                    <label key={item.id} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={checkStates[step.id]?.[item.id] ?? false}
+                        onChange={(e) => {
+                          setCheckStates(prev => ({
+                            ...prev,
+                            [step.id]: {
+                              ...(prev[step.id] ?? {}),
+                              [item.id]: e.target.checked,
+                            },
+                          }));
+                        }}
+                        className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className={`text-sm ${checkStates[step.id]?.[item.id] ? 'text-blue-400 line-through' : 'text-blue-800'}`}>
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               )}
             </div>
