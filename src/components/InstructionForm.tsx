@@ -7,7 +7,7 @@ import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, Instruct
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
-import { addStepNavLinks, addSheetCheckboxes } from '@/lib/sheetsNavLinks';
+import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
 import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
@@ -232,6 +232,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       }
       if (checkboxCells.length > 0) {
         await addSheetCheckboxes(spreadsheetId, checkboxCells);
+        await addResetScript(spreadsheetId);
       }
 
       // Upload JSON (both modes)
