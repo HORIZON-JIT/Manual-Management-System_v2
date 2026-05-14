@@ -263,6 +263,7 @@ export const RESET_SCRIPT_SOURCE = `function onOpen() {
             if (validations[r][c].getCriteriaType() === SpreadsheetApp.DataValidationCriteria.CHECKBOX) {
               values[r][c] = false;
               changed = true;
+              sheet.getRange(r + 1, 3, 1, 12).setFontLine('none');
             }
           } catch(e) {}
         }
@@ -270,6 +271,18 @@ export const RESET_SCRIPT_SOURCE = `function onOpen() {
     }
     if (changed) range.setValues(values);
   }
+}
+
+function onEdit(e) {
+  var range = e.range;
+  if (range.getColumn() !== 2 || range.getNumRows() !== 1) return;
+  var validation = range.getDataValidation();
+  if (!validation) return;
+  try {
+    if (validation.getCriteriaType() !== SpreadsheetApp.DataValidationCriteria.CHECKBOX) return;
+  } catch(e) { return; }
+  var isChecked = range.getValue() === true;
+  range.getSheet().getRange(range.getRow(), 3, 1, 12).setFontLine(isChecked ? 'line-through' : 'none');
 }`;
 
 const APPSSCRIPT_MANIFEST = JSON.stringify({
