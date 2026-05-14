@@ -184,7 +184,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'error'; folderUrl?: string } | null>(null);
-  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string } | null>(null);
+  const [saveSuccessModal, setSaveSuccessModal] = useState<{ folderName: string; folderUrl?: string; viewUrl?: string } | null>(null);
+  const [viewUrlCopied, setViewUrlCopied] = useState(false);
 
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
 
@@ -236,10 +237,10 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         scriptAttached = await addResetScript(spreadsheetId);
       }
 
-      // Upload JSON (both modes)
+      // Upload JSON (both modes) — capture file ID for view link
       const jsonStr = JSON.stringify(instruction, null, 2);
       const jsonBuffer = new TextEncoder().encode(jsonStr).buffer;
-      await saveFileToDrive(
+      const driveFileId = await saveFileToDrive(
         jsonBuffer,
         `${instruction.title}.json`,
         'application/json',
@@ -249,9 +250,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       const folderUrl = targetFolder?.id
         ? `https://drive.google.com/drive/folders/${targetFolder.id}`
         : undefined;
-      // ローカルストレージのステータスも completed に更新（下書き残留を防止）
-      try { saveInstruction(instruction); } catch { /* Drive保存は成功しているので無視 */ }
-      setSaveSuccessModal({ folderName, folderUrl });
+      // 閲覧リンク生成
+      const viewUrl = `${window.location.origin}/instructions/view?driveFileId=${driveFileId}`;
+      // driveFileId を instruction に保存してローカルストレージを更新
+      const instructionWithDriveId = { ...instruction, driveFileId };
+      try { saveInstruction(instructionWithDriveId); } catch { /* Drive保存は成功しているので無視 */ }
+      setSaveSuccessModal({ folderName, folderUrl, viewUrl });
       void scriptAttached;
     } catch (err) {
       console.error('Drive save error:', err);
@@ -541,7 +545,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
     {saveSuccessModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-5">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4 flex flex-col items-center gap-5">
           <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
             <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -565,6 +569,30 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               )}
             </p>
           </div>
+          {saveSuccessModal.viewUrl && (
+            <div className="w-full bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-bold text-blue-800">閲覧リンク（Googleログインで誰でも開けます）</p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={saveSuccessModal.viewUrl}
+                  className="flex-1 text-xs bg-white border border-blue-200 rounded px-2 py-1.5 text-gray-700 select-all outline-none"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(saveSuccessModal.viewUrl!);
+                    setViewUrlCopied(true);
+                    setTimeout(() => setViewUrlCopied(false), 2000);
+                  }}
+                  className="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition"
+                >
+                  {viewUrlCopied ? 'コピー済' : 'コピー'}
+                </button>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => router.push('/')}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition"

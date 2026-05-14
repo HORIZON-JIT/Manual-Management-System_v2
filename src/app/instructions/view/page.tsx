@@ -10,8 +10,8 @@ import { exportToExcel, buildExcelBuffer } from '@/lib/exportSpreadsheet';
 import { exportToWord } from '@/lib/exportWord';
 import { generateShareUrl, parseShareData, getViewPageBaseUrl, ShareResult } from '@/lib/shareLink';
 import ShareLinkModal from '@/components/ShareLinkModal';
-import { saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
-import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState } from '@/lib/googleAuth';
+import { saveFileToDrive, getTargetFolder, downloadDriveFile } from '@/lib/googleDrive';
+import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
 
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -81,14 +81,33 @@ function InstructionViewContent() {
       return;
     }
 
-    // Priority 3: load from localStorage by id
+    // Priority 3: load from Drive by driveFileId
+    const driveFileId = searchParams.get('driveFileId');
+    if (driveFileId) {
+      initGoogleAuth().then(() => {
+        const state = getAuthState();
+        if (!state.isSignedIn) {
+          setLoading(false);
+          return;
+        }
+        return downloadDriveFile(driveFileId)
+          .then((text) => {
+            const data = JSON.parse(text) as WorkInstruction;
+            setInstruction(data);
+          })
+          .catch(() => setInstruction(null));
+      }).finally(() => setLoading(false));
+      return;
+    }
+
+    // Priority 4: load from localStorage by id
     const id = searchParams.get('id');
     if (id) {
       const data = getInstruction(id);
       setInstruction(data || null);
     }
     setLoading(false);
-  }, [searchParams]);
+  }, [searchParams, auth.isSignedIn]);
 
   const handleDelete = () => {
     if (!instruction) return;
@@ -178,6 +197,25 @@ function InstructionViewContent() {
   }
 
   if (!instruction) {
+    const driveFileId = searchParams.get('driveFileId');
+    if (driveFileId && !auth.isSignedIn) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 px-4">
+          <p className="text-slate-700 text-base font-medium">この手順書を閲覧するにはGoogleログインが必要です</p>
+          {isGoogleConfigured() && (
+            <button
+              onClick={() => signIn()}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition"
+            >
+              Googleでログイン
+            </button>
+          )}
+          <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
+            一覧に戻る
+          </Link>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
         <p className="text-slate-500 text-lg">手順書が見つかりません</p>
