@@ -1,6 +1,6 @@
 'use client';
 
-import { Step, CheckItem, getStepImages } from '@/types/instruction';
+import { Step, CheckItem, Condition, getStepImages } from '@/types/instruction';
 import { useRef, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { compressImage } from '@/lib/compressImage';
@@ -9,6 +9,7 @@ interface StepEditorProps {
   step: Step;
   index: number;
   totalSteps: number;
+  conditions?: Condition[];
   onChange: (step: Step) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -19,6 +20,7 @@ export default function StepEditor({
   step,
   index,
   totalSteps,
+  conditions,
   onChange,
   onRemove,
   onMoveUp,
@@ -175,6 +177,21 @@ export default function StepEditor({
       </div>
 
       <div className="space-y-3">
+        {conditions && conditions.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">表示条件</label>
+            <select
+              value={step.conditionId ?? ''}
+              onChange={(e) => onChange({ ...step, conditionId: e.target.value || undefined })}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+            >
+              <option value="">共通（すべての条件で表示）</option>
+              {conditions.map((c, ci) => (
+                <option key={c.id} value={c.id}>{c.label || `条件 ${ci + 1}`}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
           <input

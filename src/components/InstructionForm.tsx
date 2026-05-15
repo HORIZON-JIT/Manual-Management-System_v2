@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { WorkInstruction, Step, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
@@ -68,6 +68,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   );
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('jump');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [conditions, setConditions] = useState<Condition[]>(initialData?.conditions ?? []);
 
   const hasRestorableVersions = isEdit && initialData?.updateHistory?.some(e => !!e.snapshot);
 
@@ -114,6 +115,15 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     if (targetIndex < 0 || targetIndex >= newSteps.length) return;
     [newSteps[index], newSteps[targetIndex]] = [newSteps[targetIndex], newSteps[index]];
     setSteps(newSteps.map((s, i) => ({ ...s, orderIndex: i })));
+  };
+
+  const addCondition = () => {
+    setConditions(prev => [...prev, { id: uuidv4(), label: '' }]);
+  };
+
+  const removeCondition = (condId: string) => {
+    setConditions(prev => prev.filter(c => c.id !== condId));
+    setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined } : s));
   };
 
   const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
@@ -180,6 +190,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       updateHistory: updateHistory.length > 0 ? updateHistory : undefined,
       status,
       keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
+      conditions: conditions.length > 0 ? conditions : undefined,
     };
   };
 
@@ -439,6 +450,51 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         </div>
       </div>
 
+      {/* Conditions */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-gray-700">条件分岐（任意）</h2>
+            <p className="text-xs text-gray-400 mt-0.5">条件を追加すると各ステップに条件タグを付けられます</p>
+          </div>
+          <button
+            type="button"
+            onClick={addCondition}
+            className="px-3 py-1.5 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition"
+          >
+            + 条件を追加
+          </button>
+        </div>
+        {conditions.length > 0 && (
+          <div className="space-y-2">
+            {conditions.map((cond, ci) => (
+              <div key={cond.id} className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-400 w-5 text-center">{ci + 1}</span>
+                <input
+                  type="text"
+                  value={cond.label}
+                  onChange={(e) => {
+                    const updated = [...conditions];
+                    updated[ci] = { ...cond, label: e.target.value };
+                    setConditions(updated);
+                  }}
+                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder={`例: Aだった場合`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCondition(cond.id)}
+                  className="text-red-400 hover:text-red-600 px-1 text-lg leading-none"
+                  title="条件を削除"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Steps */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-700">手順ステップ</h2>
@@ -448,6 +504,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             step={step}
             index={index}
             totalSteps={steps.length}
+            conditions={conditions}
             onChange={(s) => handleStepChange(index, s)}
             onRemove={() => handleRemoveStep(index)}
             onMoveUp={() => handleMoveStep(index, 'up')}

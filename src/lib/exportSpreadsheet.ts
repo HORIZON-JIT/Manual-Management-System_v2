@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { WorkInstruction, Condition, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
 
 /** Estimate row height for text in merged content columns */
 function calcRowHeight(text: string, charsPerLine: number, lineHeight: number, minHeight: number): number {
@@ -39,6 +39,21 @@ const C = {
 
 const THIN_BORDER: Partial<ExcelJS.Border> = { style: 'medium', color: { argb: C.border } };
 const NO_BORDER: Partial<ExcelJS.Border> = { style: undefined };
+
+// Condition color palette (accent, step header bg, step header text, divider bg)
+interface CondColor { accent: string; headerBg: string; headerText: string; dividerBg: string; }
+const COND_COLORS: CondColor[] = [
+  { accent: 'EA580C', headerBg: 'FFF7ED', headerText: '7C2D12', dividerBg: 'FED7AA' }, // orange
+  { accent: '7C3AED', headerBg: 'F5F3FF', headerText: '4C1D95', dividerBg: 'DDD6FE' }, // purple
+  { accent: 'BE185D', headerBg: 'FFF1F2', headerText: '881337', dividerBg: 'FECDD3' }, // rose
+];
+
+function buildCondColorMap(conditions?: Condition[]): Map<string, CondColor> {
+  const m = new Map<string, CondColor>();
+  if (!conditions) return m;
+  conditions.forEach((c, i) => m.set(c.id, COND_COLORS[Math.min(i, COND_COLORS.length - 1)]));
+  return m;
+}
 
 function parseDataUrl(dataUrl: string): { base64: string; extension: 'png' | 'jpeg' } {
   const match = dataUrl.match(/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/);
@@ -279,6 +294,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   const indexNavRows: number[] = [];  // 0-based row index of index buttons on main sheet
   const checkboxCells: CheckboxCell[] = [];
   const mainSheetRowBeforeSteps = row;  // save row for main sheet (jump mode resets row)
+  const condColorMap = buildCondColorMap(instruction.conditions);
 
   // Column definitions for reuse when creating per-step sheets
   const colDefs = [
@@ -287,9 +303,17 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     ...Array(12).fill(null).map(() => ({ width: contentColWidth })), // C-N
   ];
 
+  // Track condition group to insert dividers in scroll mode
+  let lastCondKey: string = 'shared';
+
   for (let i = 0; i < sortedSteps.length; i++) {
     const step = sortedSteps[i];
     const stepNum = String(i + 1).padStart(2, '0');
+    const condColors = step.conditionId ? condColorMap.get(step.conditionId) : null;
+    const accentColor = condColors ? condColors.accent : C.accent;
+    const headerBgColor = condColors ? condColors.headerBg : C.headerBg;
+    const headerTextColor = condColors ? condColors.headerText : C.stepTitle;
+    const currentCondKey = step.conditionId ?? 'shared';
 
     // In jump mode, each step gets its own sheet tab for navigation
     let sws = ws;
@@ -304,32 +328,53 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       row = 1;
     }
 
+    // Condition divider row (scroll mode only) when transitioning between groups
+    if (navMode === 'scroll' && instruction.conditions && instruction.conditions.length > 0 && currentCondKey !== lastCondKey) {
+      const dividerLabel = currentCondKey === 'shared'
+        ? '▼ 共通（すべて）'
+        : `▼ ${instruction.conditions.find(c => c.id === currentCondKey)?.label ?? '条件'}のみ`;
+      const dividerBg = condColors ? condColors.dividerBg : C.headerBg;
+      ws.getRow(row).height = 26;
+      mergeStyled(ws, row, 1, row, LAST_COL, `  ${dividerLabel}`, {
+        font: { bold: true, size: 11, color: { argb: condColors ? condColors.headerText : C.primary } },
+        fill: solidFill(dividerBg),
+        alignment: { horizontal: 'left', vertical: 'middle' },
+        border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+      });
+      row++;
+      lastCondKey = currentCondKey;
+    }
+
     // --- Step header row ---
     sws.getRow(row).height = 42;
 
-    // A: accent stripe
+    // A: accent stripe (condition-colored)
     const accentCell = sws.getCell(row, 1);
-    accentCell.fill = solidFill(C.accent);
+    accentCell.fill = solidFill(accentColor);
     setBoxBorder(accentCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
     // B: step number
     const numCell = sws.getCell(row, 2);
     numCell.value = stepNum;
     numCell.font = { name: 'Arial', bold: true, size: 18, color: { argb: C.white } };
-    numCell.fill = solidFill(C.primaryMid);
+    numCell.fill = solidFill(condColors ? accentColor : C.primaryMid);
     numCell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBoxBorder(numCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
-    // C-N: step title (full width always)
-    mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, `  ${step.title}`, {
-      font: { bold: true, size: 15, color: { argb: C.stepTitle } },
-      fill: solidFill(C.headerBg),
+    // C-N: step title (condition label prefix if applicable)
+    const condLabel = condColors && step.conditionId
+      ? instruction.conditions?.find(c => c.id === step.conditionId)?.label
+      : null;
+    const titleText = condLabel ? `  [${condLabel}] ${step.title}` : `  ${step.title}`;
+    mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, titleText, {
+      font: { bold: true, size: 15, color: { argb: headerTextColor } },
+      fill: solidFill(headerBgColor),
       alignment: { horizontal: 'left' },
       border: {
-        top: { style: 'thin', color: { argb: C.borderBlue } },
-        bottom: { style: 'medium', color: { argb: C.borderBlue } },
+        top: { style: 'thin', color: { argb: condColors ? condColors.accent : C.borderBlue } },
+        bottom: { style: 'medium', color: { argb: condColors ? condColors.accent : C.borderBlue } },
         left: NO_BORDER,
-        right: { style: 'thin', color: { argb: C.borderBlue } },
+        right: { style: 'thin', color: { argb: condColors ? condColors.accent : C.borderBlue } },
       },
     });
     row++;
@@ -338,9 +383,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     if (step.description) {
       sws.getRow(row).height = calcRowHeight(step.description, 58, 20, 40);
 
-      // A: accent
+      // A: accent (condition-colored)
       const aCell = sws.getCell(row, 1);
-      aCell.fill = solidFill(C.accent);
+      aCell.fill = solidFill(accentColor);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
       // B: label
@@ -364,7 +409,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     if (step.caution) {
       sws.getRow(row).height = calcRowHeight(step.caution, 58, 20, 36);
 
-      // A: amber accent
+      // A: accent (caution uses amber border color to distinguish from condition accent)
       const aCell = sws.getCell(row, 1);
       aCell.fill = solidFill(C.cautionBorder);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
@@ -425,9 +470,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
       for (let r = 0; r < imageRows; r++) {
         sws.getRow(imageStartRow + r).height = IMAGE_ROW_HEIGHT;
-        // A: accent stripe continuation
+        // A: accent stripe continuation (condition-colored)
         const aCell = sws.getCell(imageStartRow + r, 1);
-        aCell.fill = solidFill(C.accent);
+        aCell.fill = solidFill(accentColor);
         setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
         // B: label column (separate from image merge)
@@ -470,7 +515,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         sws.getRow(row).height = calcRowHeight(caption, 58, 18, 28);
 
         const aCap = sws.getCell(row, 1);
-        aCap.fill = solidFill(C.accent);
+        aCap.fill = solidFill(accentColor);
         setBoxBorder(aCap, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
         const bCap = sws.getCell(row, 2);
@@ -490,9 +535,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     if (step.videoUrl) {
       sws.getRow(row).height = 30;
 
-      // A: accent
+      // A: accent (condition-colored)
       const aCell = sws.getCell(row, 1);
-      aCell.fill = solidFill(C.accent);
+      aCell.fill = solidFill(accentColor);
       setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
       // B: label
@@ -522,7 +567,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         sws.getRow(row).height = 22;
 
         const aCell = sws.getCell(row, 1);
-        aCell.fill = solidFill(C.primary);
+        aCell.fill = solidFill(accentColor);
         setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
         const labelCell = sws.getCell(row, 2);
@@ -547,9 +592,9 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       const isLastStep = i === sortedSteps.length - 1;
       sws.getRow(row).height = 36;
 
-      // A: accent stripe
+      // A: accent stripe (condition-colored)
       const aNav = sws.getCell(row, 1);
-      aNav.fill = solidFill(C.accent);
+      aNav.fill = solidFill(accentColor);
 
       // B-N: nav button (merged, blue bar)
       mergeStyled(sws, row, 2, row, LAST_COL, isLastStep ? '↑ 概要へ戻る' : '次へ →', {

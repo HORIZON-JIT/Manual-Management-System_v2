@@ -3,6 +3,11 @@ export interface CheckItem {
   label: string;
 }
 
+export interface Condition {
+  id: string;
+  label: string;
+}
+
 export interface Step {
   id: string;
   orderIndex: number;
@@ -15,6 +20,7 @@ export interface Step {
   videoUrl?: string;
   caution?: string;
   checkItems?: CheckItem[];
+  conditionId?: string;
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
@@ -65,6 +71,7 @@ export interface WorkInstruction {
   status?: InstructionStatus;
   keywords?: string[];
   driveFileId?: string;
+  conditions?: Condition[];
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {
