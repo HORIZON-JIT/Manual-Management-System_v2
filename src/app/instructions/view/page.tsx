@@ -34,7 +34,7 @@ function InstructionViewContent() {
   const [isPreviewView, setIsPreviewView] = useState(false);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
-  const [selectedConditions, setSelectedConditions] = useState<Record<number, string | null>>({});
+  const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -146,35 +146,64 @@ function InstructionViewContent() {
     );
   }
 
-  const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const rawSorted = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const hasConditions = instruction.conditions && instruction.conditions.length > 0;
 
-  const conditionToZone = new Map<string, number>();
-  if (hasConditions) {
-    let zoneIndex = -1;
+  const sortedSteps = (() => {
+    if (!hasConditions) return rawSorted;
+    const hasGroups = rawSorted.some(s => s.conditionGroup);
+    if (hasGroups) return rawSorted;
     let inBlock = false;
-    for (const s of sortedSteps) {
-      if (s.conditionId) {
-        if (!inBlock) { zoneIndex++; inBlock = true; }
-        if (!conditionToZone.has(s.conditionId)) {
-          conditionToZone.set(s.conditionId, zoneIndex);
-        }
-      } else {
-        inBlock = false;
+    let currentGroup = '';
+    return rawSorted.map(s => {
+      if (s.conditionId && !s.conditionGroup) {
+        if (!inBlock) { currentGroup = `__legacy_${Date.now()}_${Math.random()}`; inBlock = true; }
+        return { ...s, conditionGroup: currentGroup };
       }
+      inBlock = false;
+      return s;
+    });
+  })();
+
+  const groupConditions = new Map<string, typeof instruction.conditions>();
+  if (hasConditions && instruction.conditions) {
+    const groupCondIds = new Map<string, Set<string>>();
+    for (const s of sortedSteps) {
+      if (s.conditionGroup && s.conditionId) {
+        if (!groupCondIds.has(s.conditionGroup)) groupCondIds.set(s.conditionGroup, new Set());
+        groupCondIds.get(s.conditionGroup)!.add(s.conditionId);
+      }
+    }
+    for (const [gid, condIds] of groupCondIds) {
+      groupConditions.set(gid, instruction.conditions.filter(c => condIds.has(c.id)));
     }
   }
 
   const visibleSteps = hasConditions
     ? sortedSteps.filter(s => {
-        if (!s.conditionId) return true;
-        const zone = conditionToZone.get(s.conditionId);
-        if (zone === undefined) return true;
-        const sel = selectedConditions[zone];
+        if (!s.conditionId || !s.conditionGroup) return true;
+        const sel = selectedConditions[s.conditionGroup];
         if (sel === undefined || sel === null) return true;
         return s.conditionId === sel;
       })
     : sortedSteps;
+
+  const stepNumbers: number[] = [];
+  {
+    let logicalNum = 0;
+    const seenGroups = new Set<string>();
+    for (const s of visibleSteps) {
+      if (s.conditionGroup) {
+        if (!seenGroups.has(s.conditionGroup)) {
+          logicalNum++;
+          seenGroups.add(s.conditionGroup);
+        }
+      } else {
+        logicalNum++;
+      }
+      stepNumbers.push(logicalNum);
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -279,23 +308,19 @@ function InstructionViewContent() {
       <div className="space-y-4">
         {visibleSteps.map((step, index) => {
           const prevStep = index > 0 ? visibleSteps[index - 1] : null;
-          const isConditioned = !!step.conditionId;
-          const prevWasConditioned = prevStep ? !!prevStep.conditionId : false;
-          const showInlineTabs = hasConditions && isConditioned && !prevWasConditioned;
-          const zoneIndex = step.conditionId ? conditionToZone.get(step.conditionId) : undefined;
-          const zoneConditions = zoneIndex !== undefined
-            ? instruction.conditions!.filter(c => conditionToZone.get(c.id) === zoneIndex)
-            : [];
-          const zoneSel = zoneIndex !== undefined ? (selectedConditions[zoneIndex] ?? null) : null;
+          const group = step.conditionGroup;
+          const showInlineTabs = hasConditions && !!group && group !== (prevStep?.conditionGroup ?? undefined);
+          const zoneConds = group ? groupConditions.get(group) ?? [] : [];
+          const zoneSel = group ? (selectedConditions[group] ?? null) : null;
 
           return (
           <Fragment key={step.id}>
-            {showInlineTabs && zoneIndex !== undefined && (
+            {showInlineTabs && group && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
                 <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
                 <div className="flex gap-2 flex-wrap">
                   <button
-                    onClick={() => setSelectedConditions(prev => ({ ...prev, [zoneIndex]: null }))}
+                    onClick={() => setSelectedConditions(prev => ({ ...prev, [group]: null }))}
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                       zoneSel === null
                         ? 'bg-blue-600 text-white shadow-sm'
@@ -304,10 +329,10 @@ function InstructionViewContent() {
                   >
                     すべて表示
                   </button>
-                  {zoneConditions.map((cond) => (
+                  {zoneConds.map((cond) => (
                     <button
                       key={cond.id}
-                      onClick={() => setSelectedConditions(prev => ({ ...prev, [zoneIndex]: cond.id }))}
+                      onClick={() => setSelectedConditions(prev => ({ ...prev, [group]: cond.id }))}
                       className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                         zoneSel === cond.id
                           ? 'bg-blue-600 text-white shadow-sm'
@@ -326,7 +351,7 @@ function InstructionViewContent() {
             <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3.5 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <span className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-lg font-bold text-sm shrink-0 shadow-sm">
-                  {index + 1}
+                  {stepNumbers[index]}
                 </span>
                 <h2 className="font-semibold text-slate-800 flex-1">{step.title}</h2>
                 {zoneSel === null && step.conditionId && instruction.conditions && (
@@ -349,7 +374,7 @@ function InstructionViewContent() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imgUrl}
-                    alt={`ステップ ${index + 1} の画像 ${imgIdx + 1}`}
+                    alt={`ステップ ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
                     className="max-w-full h-auto mx-auto"
                   />
                   {getImageCaption(step, imgIdx) && (
@@ -366,7 +391,7 @@ function InstructionViewContent() {
                     <div className="relative w-full rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
                       <iframe
                         src={getYouTubeEmbedUrl(step.videoUrl)!}
-                        title={`ステップ ${index + 1} の動画`}
+                        title={`ステップ ${stepNumbers[index]} の動画`}
                         className="absolute inset-0 w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
