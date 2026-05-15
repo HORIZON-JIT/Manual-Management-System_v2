@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, Fragment } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
@@ -251,42 +251,49 @@ function InstructionViewContent() {
         )}
       </div>
 
-      {/* Condition tabs */}
-      {hasConditions && (
-        <div className="flex gap-2 flex-wrap no-print">
-          <button
-            onClick={() => setSelectedConditionId(null)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              selectedConditionId === null
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            すべて表示
-          </button>
-          {instruction.conditions!.map((cond) => (
-            <button
-              key={cond.id}
-              onClick={() => setSelectedConditionId(cond.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                selectedConditionId === cond.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {cond.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Steps */}
       <div className="space-y-4">
-        {visibleSteps.map((step, index) => (
-          <div
-            key={step.id}
-            className="bg-white rounded-xl border border-slate-200 overflow-hidden"
-          >
+        {visibleSteps.map((step, index) => {
+          const prevStep = index > 0 ? visibleSteps[index - 1] : null;
+          const isConditioned = !!step.conditionId;
+          const prevWasConditioned = prevStep ? !!prevStep.conditionId : false;
+          const showInlineTabs = hasConditions && isConditioned && !prevWasConditioned;
+
+          return (
+          <Fragment key={step.id}>
+            {showInlineTabs && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
+                <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedConditionId(null)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                      selectedConditionId === null
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    すべて表示
+                  </button>
+                  {instruction.conditions!.map((cond) => (
+                    <button
+                      key={cond.id}
+                      onClick={() => setSelectedConditionId(cond.id)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                        selectedConditionId === cond.id
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      {cond.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div
+              className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+            >
             <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3.5 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <span className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-lg font-bold text-sm shrink-0 shadow-sm">
@@ -394,8 +401,10 @@ function InstructionViewContent() {
                 </div>
               )}
             </div>
-          </div>
-        ))}
+            </div>
+          </Fragment>
+          );
+        })}
       </div>
 
     </div>
