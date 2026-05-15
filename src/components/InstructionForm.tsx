@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { WorkInstruction, Step, Condition, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, ConditionGroup, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
@@ -55,24 +55,11 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       : ''
   );
   const [description, setDescription] = useState(initialData?.description || '');
-  const [steps, setSteps] = useState<Step[]>(() => {
-    const initial = initialData?.steps?.length
+  const [steps, setSteps] = useState<Step[]>(
+    initialData?.steps?.length
       ? [...initialData.steps].sort((a, b) => a.orderIndex - b.orderIndex)
-      : [createEmptyStep(0)];
-    if (initialData?.conditions?.length) {
-      let inBlock = false;
-      let currentGroup = '';
-      return initial.map(s => {
-        if (s.conditionId && !s.conditionGroup) {
-          if (!inBlock) { currentGroup = uuidv4(); inBlock = true; }
-          return { ...s, conditionGroup: currentGroup };
-        }
-        inBlock = false;
-        return s;
-      });
-    }
-    return initial;
-  });
+      : [createEmptyStep(0)]
+  );
   const [authorName, setAuthorName] = useState(
     initialData?.updatedBy || initialData?.createdBy || getLastAuthorName()
   );
@@ -83,7 +70,21 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   );
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('jump');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [conditions, setConditions] = useState<Condition[]>(initialData?.conditions ?? []);
+  const [conditions, setConditions] = useState<Condition[]>(() => {
+    const raw = initialData?.conditions ?? [];
+    if (raw.length === 0) return [];
+    if (raw.some(c => c.group)) return raw;
+    const defaultGroup = uuidv4();
+    return raw.map(c => ({ ...c, group: defaultGroup }));
+  });
+
+  const [groupParents, setGroupParents] = useState<Record<string, string | undefined>>(() => {
+    const parents: Record<string, string | undefined> = {};
+    for (const cg of initialData?.conditionGroups ?? []) {
+      if (cg.parentConditionId) parents[cg.id] = cg.parentConditionId;
+    }
+    return parents;
+  });
 
   const hasRestorableVersions = isEdit && initialData?.updateHistory?.some(e => !!e.snapshot);
 
@@ -108,12 +109,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   };
 
   const handleStepChange = (index: number, updatedStep: Step) => {
-    if (updatedStep.conditionId && !updatedStep.conditionGroup) {
-      updatedStep = { ...updatedStep, conditionGroup: uuidv4() };
-    }
-    if (!updatedStep.conditionId && updatedStep.conditionGroup) {
-      updatedStep = { ...updatedStep, conditionGroup: undefined };
-    }
     const newSteps = [...steps];
     newSteps[index] = updatedStep;
     setSteps(newSteps);
@@ -138,13 +133,39 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     setSteps(newSteps.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
-  const addCondition = () => {
-    setConditions(prev => [...prev, { id: uuidv4(), label: '' }]);
+  const addGroup = () => {
+    const groupId = uuidv4();
+    setConditions(prev => [...prev, { id: uuidv4(), label: '', group: groupId }]);
+  };
+
+  const addConditionToGroup = (groupId: string) => {
+    setConditions(prev => [...prev, { id: uuidv4(), label: '', group: groupId }]);
   };
 
   const removeCondition = (condId: string) => {
     setConditions(prev => prev.filter(c => c.id !== condId));
-    setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined, conditionGroup: undefined } : s));
+    setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined } : s));
+    setGroupParents(prev => {
+      const updated = { ...prev };
+      for (const [gid, pid] of Object.entries(updated)) {
+        if (pid === condId) delete updated[gid];
+      }
+      return updated;
+    });
+  };
+
+  const removeGroup = (groupId: string) => {
+    const condIds = new Set(conditions.filter(c => c.group === groupId).map(c => c.id));
+    setConditions(prev => prev.filter(c => c.group !== groupId));
+    setSteps(prev => prev.map(s => condIds.has(s.conditionId ?? '') ? { ...s, conditionId: undefined } : s));
+    setGroupParents(prev => {
+      const updated = { ...prev };
+      delete updated[groupId];
+      for (const [gid, pid] of Object.entries(updated)) {
+        if (pid && condIds.has(pid)) delete updated[gid];
+      }
+      return updated;
+    });
   };
 
   const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
@@ -212,6 +233,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       status,
       keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
       conditions: conditions.length > 0 ? conditions : undefined,
+      conditionGroups: (() => {
+        const cgs = Object.entries(groupParents)
+          .filter((entry): entry is [string, string] => !!entry[1])
+          .map(([id, parentConditionId]) => ({ id, parentConditionId }));
+        return cgs.length > 0 ? cgs : undefined;
+      })(),
     };
   };
 
@@ -476,84 +503,101 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-medium text-gray-700">条件分岐（任意）</h2>
-            <p className="text-xs text-gray-400 mt-0.5">条件を追加すると各ステップに条件タグを付けられます</p>
+            <p className="text-xs text-gray-400 mt-0.5">同じグループ内の条件は同じステップ番号で表示されます</p>
           </div>
           <button
             type="button"
-            onClick={addCondition}
+            onClick={addGroup}
             className="px-3 py-1.5 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition"
           >
-            + 条件を追加
+            + グループを追加
           </button>
         </div>
-        {conditions.length > 0 && (
-          <div className="space-y-2">
-            {conditions.map((cond, ci) => (
-              <div key={cond.id} className="flex items-center gap-2">
-                <span className="text-xs font-medium text-gray-400 w-5 text-center">{ci + 1}</span>
-                <input
-                  type="text"
-                  value={cond.label}
-                  onChange={(e) => {
-                    const updated = [...conditions];
-                    updated[ci] = { ...cond, label: e.target.value };
-                    setConditions(updated);
-                  }}
-                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder={`例: Aだった場合`}
-                />
+        {(() => {
+          const groupOrder: string[] = [];
+          const grouped = new Map<string, Condition[]>();
+          for (const c of conditions) {
+            const g = c.group || '__default';
+            if (!grouped.has(g)) { grouped.set(g, []); groupOrder.push(g); }
+            grouped.get(g)!.push(c);
+          }
+          const otherConditions = (gid: string) => conditions.filter(c => c.group !== gid);
+          return groupOrder.map((gid, gi) => (
+            <div key={gid} className="border border-blue-100 bg-blue-50/30 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-blue-600">グループ {String.fromCharCode(65 + gi)}</span>
                 <button
                   type="button"
-                  onClick={() => removeCondition(cond.id)}
-                  className="text-red-400 hover:text-red-600 px-1 text-lg leading-none"
-                  title="条件を削除"
+                  onClick={() => removeGroup(gid)}
+                  className="text-xs text-red-400 hover:text-red-600 transition"
                 >
-                  &times;
+                  グループ削除
                 </button>
               </div>
-            ))}
-          </div>
-        )}
+              {otherConditions(gid).length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 whitespace-nowrap">親条件:</label>
+                  <select
+                    value={groupParents[gid] ?? ''}
+                    onChange={(e) => setGroupParents(prev => ({ ...prev, [gid]: e.target.value || undefined }))}
+                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                  >
+                    <option value="">なし（常に表示）</option>
+                    {otherConditions(gid).map(c => (
+                      <option key={c.id} value={c.id}>{c.label || '(未入力)'}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {grouped.get(gid)!.map((cond) => (
+                <div key={cond.id} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={cond.label}
+                    onChange={(e) => {
+                      setConditions(prev => prev.map(c => c.id === cond.id ? { ...c, label: e.target.value } : c));
+                    }}
+                    className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                    placeholder="例: Aだった場合"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCondition(cond.id)}
+                    className="text-red-400 hover:text-red-600 px-1 text-lg leading-none"
+                    title="条件を削除"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addConditionToGroup(gid)}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                + 条件を追加
+              </button>
+            </div>
+          ));
+        })()}
       </div>
 
       {/* Steps */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-700">手順ステップ</h2>
-        {(() => {
-          const groupOrder: string[] = [];
-          const groupCondIds = new Map<string, Set<string>>();
-          for (const s of steps) {
-            if (s.conditionGroup && s.conditionId) {
-              if (!groupCondIds.has(s.conditionGroup)) {
-                groupCondIds.set(s.conditionGroup, new Set());
-                groupOrder.push(s.conditionGroup);
-              }
-              groupCondIds.get(s.conditionGroup)!.add(s.conditionId);
-            }
-          }
-          const conditionGroupInfos = groupOrder.map((gid, idx) => {
-            const condIds = groupCondIds.get(gid)!;
-            const labels = Array.from(condIds)
-              .map(cid => conditions.find(c => c.id === cid)?.label)
-              .filter(Boolean)
-              .join(', ');
-            return { id: gid, label: `グループ ${String.fromCharCode(65 + idx)}`, description: labels };
-          });
-          return steps.map((step, index) => (
-            <StepEditor
-              key={step.id}
-              step={step}
-              index={index}
-              totalSteps={steps.length}
-              conditions={conditions}
-              conditionGroups={conditionGroupInfos}
-              onChange={(s) => handleStepChange(index, s)}
-              onRemove={() => handleRemoveStep(index)}
-              onMoveUp={() => handleMoveStep(index, 'up')}
-              onMoveDown={() => handleMoveStep(index, 'down')}
-            />
-          ));
-        })()}
+        {steps.map((step, index) => (
+          <StepEditor
+            key={step.id}
+            step={step}
+            index={index}
+            totalSteps={steps.length}
+            conditions={conditions}
+            onChange={(s) => handleStepChange(index, s)}
+            onRemove={() => handleRemoveStep(index)}
+            onMoveUp={() => handleMoveStep(index, 'up')}
+            onMoveDown={() => handleMoveStep(index, 'down')}
+          />
+        ))}
 
         <button
           type="button"

@@ -6,6 +6,7 @@ export interface CheckItem {
 export interface Condition {
   id: string;
   label: string;
+  group?: string;
 }
 
 export interface Step {
@@ -21,7 +22,6 @@ export interface Step {
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
-  conditionGroup?: string;
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
@@ -58,6 +58,11 @@ export interface UpdateHistoryEntry {
 
 export type InstructionStatus = 'draft' | 'completed';
 
+export interface ConditionGroup {
+  id: string;
+  parentConditionId?: string;
+}
+
 export interface WorkInstruction {
   id: string;
   title: string;
@@ -73,6 +78,7 @@ export interface WorkInstruction {
   keywords?: string[];
   driveFileId?: string;
   conditions?: Condition[];
+  conditionGroups?: ConditionGroup[];
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {
