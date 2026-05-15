@@ -5,18 +5,11 @@ import { useRef, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { compressImage } from '@/lib/compressImage';
 
-interface ConditionGroupInfo {
-  id: string;
-  label: string;
-  description: string;
-}
-
 interface StepEditorProps {
   step: Step;
   index: number;
   totalSteps: number;
   conditions?: Condition[];
-  conditionGroups?: ConditionGroupInfo[];
   onChange: (step: Step) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -28,7 +21,6 @@ export default function StepEditor({
   index,
   totalSteps,
   conditions,
-  conditionGroups,
   onChange,
   onRemove,
   onMoveUp,
@@ -185,38 +177,40 @@ export default function StepEditor({
       </div>
 
       <div className="space-y-3">
-        {conditions && conditions.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">表示条件</label>
-            <select
-              value={step.conditionId ?? ''}
-              onChange={(e) => onChange({ ...step, conditionId: e.target.value || undefined })}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-            >
-              <option value="">共通（すべての条件で表示）</option>
-              {conditions.map((c, ci) => (
-                <option key={c.id} value={c.id}>{c.label || `条件 ${ci + 1}`}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {step.conditionId && conditionGroups && conditionGroups.length > 1 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">分岐グループ</label>
-            <select
-              value={step.conditionGroup ?? ''}
-              onChange={(e) => onChange({ ...step, conditionGroup: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-            >
-              {conditionGroups.map(g => (
-                <option key={g.id} value={g.id}>
-                  {g.label}{g.description ? ` — ${g.description}` : ''}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-400">同じグループのステップは同じステップ番号で表示されます</p>
-          </div>
-        )}
+        {conditions && conditions.length > 0 && (() => {
+          const groupOrder: string[] = [];
+          const grouped = new Map<string, Condition[]>();
+          for (const c of conditions) {
+            const g = c.group || '__default';
+            if (!grouped.has(g)) { grouped.set(g, []); groupOrder.push(g); }
+            grouped.get(g)!.push(c);
+          }
+          const hasMultipleGroups = groupOrder.length > 1;
+          return (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">表示条件</label>
+              <select
+                value={step.conditionId ?? ''}
+                onChange={(e) => onChange({ ...step, conditionId: e.target.value || undefined })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              >
+                <option value="">共通（すべての条件で表示）</option>
+                {hasMultipleGroups
+                  ? groupOrder.map((gid, gi) => (
+                      <optgroup key={gid} label={`グループ ${String.fromCharCode(65 + gi)}`}>
+                        {grouped.get(gid)!.map(c => (
+                          <option key={c.id} value={c.id}>{c.label || '(未入力)'}</option>
+                        ))}
+                      </optgroup>
+                    ))
+                  : conditions.map((c, ci) => (
+                      <option key={c.id} value={c.id}>{c.label || `条件 ${ci + 1}`}</option>
+                    ))
+                }
+              </select>
+            </div>
+          );
+        })()}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
           <input

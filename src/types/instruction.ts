@@ -6,6 +6,7 @@ export interface CheckItem {
 export interface Condition {
   id: string;
   label: string;
+  group?: string;
 }
 
 export interface Step {
@@ -21,7 +22,6 @@ export interface Step {
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
-  conditionGroup?: string;
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */

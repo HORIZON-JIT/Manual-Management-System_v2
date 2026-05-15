@@ -146,43 +146,27 @@ function InstructionViewContent() {
     );
   }
 
-  const rawSorted = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const hasConditions = instruction.conditions && instruction.conditions.length > 0;
 
-  const sortedSteps = (() => {
-    if (!hasConditions) return rawSorted;
-    const hasGroups = rawSorted.some(s => s.conditionGroup);
-    if (hasGroups) return rawSorted;
-    let inBlock = false;
-    let currentGroup = '';
-    return rawSorted.map(s => {
-      if (s.conditionId && !s.conditionGroup) {
-        if (!inBlock) { currentGroup = `__legacy_${Date.now()}_${Math.random()}`; inBlock = true; }
-        return { ...s, conditionGroup: currentGroup };
-      }
-      inBlock = false;
-      return s;
-    });
-  })();
-
+  const condGroupMap = new Map<string, string>();
   const groupConditions = new Map<string, typeof instruction.conditions>();
   if (hasConditions && instruction.conditions) {
-    const groupCondIds = new Map<string, Set<string>>();
-    for (const s of sortedSteps) {
-      if (s.conditionGroup && s.conditionId) {
-        if (!groupCondIds.has(s.conditionGroup)) groupCondIds.set(s.conditionGroup, new Set());
-        groupCondIds.get(s.conditionGroup)!.add(s.conditionId);
-      }
-    }
-    for (const [gid, condIds] of groupCondIds) {
-      groupConditions.set(gid, instruction.conditions.filter(c => condIds.has(c.id)));
+    for (const c of instruction.conditions) {
+      const g = c.group || '__default';
+      condGroupMap.set(c.id, g);
+      if (!groupConditions.has(g)) groupConditions.set(g, []);
+      groupConditions.get(g)!.push(c);
     }
   }
+  const getStepGroup = (s: { conditionId?: string }) =>
+    s.conditionId ? condGroupMap.get(s.conditionId) : undefined;
 
   const visibleSteps = hasConditions
     ? sortedSteps.filter(s => {
-        if (!s.conditionId || !s.conditionGroup) return true;
-        const sel = selectedConditions[s.conditionGroup];
+        const group = getStepGroup(s);
+        if (!group) return true;
+        const sel = selectedConditions[group];
         if (sel === undefined || sel === null) return true;
         return s.conditionId === sel;
       })
@@ -193,10 +177,11 @@ function InstructionViewContent() {
     let logicalNum = 0;
     const seenGroups = new Set<string>();
     for (const s of visibleSteps) {
-      if (s.conditionGroup) {
-        if (!seenGroups.has(s.conditionGroup)) {
+      const group = getStepGroup(s);
+      if (group) {
+        if (!seenGroups.has(group)) {
           logicalNum++;
-          seenGroups.add(s.conditionGroup);
+          seenGroups.add(group);
         }
       } else {
         logicalNum++;
@@ -308,8 +293,9 @@ function InstructionViewContent() {
       <div className="space-y-4">
         {visibleSteps.map((step, index) => {
           const prevStep = index > 0 ? visibleSteps[index - 1] : null;
-          const group = step.conditionGroup;
-          const showInlineTabs = hasConditions && !!group && group !== (prevStep?.conditionGroup ?? undefined);
+          const group = getStepGroup(step);
+          const prevGroup = prevStep ? getStepGroup(prevStep) : undefined;
+          const showInlineTabs = hasConditions && !!group && group !== prevGroup;
           const zoneConds = group ? groupConditions.get(group) ?? [] : [];
           const zoneSel = group ? (selectedConditions[group] ?? null) : null;
 
