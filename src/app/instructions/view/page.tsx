@@ -35,6 +35,7 @@ function InstructionViewContent() {
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
+  const [revealedCount, setRevealedCount] = useState(1);
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -207,6 +208,8 @@ function InstructionViewContent() {
     }
   }
 
+  const isSequential = !!instruction.sequential;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Preview banner */}
@@ -308,13 +311,14 @@ function InstructionViewContent() {
 
       {/* Steps */}
       <div className="space-y-4">
-        {visibleSteps.map((step, index) => {
+        {(isSequential ? visibleSteps.slice(0, revealedCount) : visibleSteps).map((step, index) => {
           const prevStep = index > 0 ? visibleSteps[index - 1] : null;
           const group = getStepGroup(step);
           const prevGroup = prevStep ? getStepGroup(prevStep) : undefined;
           const showInlineTabs = hasConditions && !!group && group !== prevGroup;
           const zoneConds = group ? groupConditions.get(group) ?? [] : [];
           const zoneSel = group ? (selectedConditions[group] ?? null) : null;
+          const isLastRevealed = isSequential && index === Math.min(revealedCount, visibleSteps.length) - 1;
 
           return (
           <Fragment key={step.id}>
@@ -323,7 +327,7 @@ function InstructionViewContent() {
                 <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
                 <div className="flex gap-2 flex-wrap">
                   <button
-                    onClick={() => setSelectedConditions(prev => ({ ...prev, [group]: null }))}
+                    onClick={() => { setSelectedConditions(prev => ({ ...prev, [group]: null })); setRevealedCount(1); }}
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                       zoneSel === null
                         ? 'bg-blue-600 text-white shadow-sm'
@@ -335,7 +339,7 @@ function InstructionViewContent() {
                   {zoneConds.map((cond) => (
                     <button
                       key={cond.id}
-                      onClick={() => setSelectedConditions(prev => ({ ...prev, [group]: cond.id }))}
+                      onClick={() => { setSelectedConditions(prev => ({ ...prev, [group]: cond.id })); setRevealedCount(1); }}
                       className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                         zoneSel === cond.id
                           ? 'bg-blue-600 text-white shadow-sm'
@@ -459,6 +463,25 @@ function InstructionViewContent() {
               )}
             </div>
             </div>
+            {isLastRevealed && (
+              <div className="flex items-center justify-between no-print">
+                <span className="text-sm text-slate-500">
+                  {stepNumbers[index]} / {stepNumbers[visibleSteps.length - 1]} ステップ
+                </span>
+                {revealedCount < visibleSteps.length ? (
+                  <button
+                    onClick={() => setRevealedCount(c => c + 1)}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
+                  >
+                    次へ →
+                  </button>
+                ) : (
+                  <span className="px-6 py-2.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl">
+                    完了 ✓
+                  </span>
+                )}
+              </div>
+            )}
           </Fragment>
           );
         })}

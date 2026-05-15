@@ -77,6 +77,7 @@ export interface WorkInstruction {
   status?: InstructionStatus;
   keywords?: string[];
   driveFileId?: string;
+  sequential?: boolean;
   conditions?: Condition[];
   conditionGroups?: ConditionGroup[];
 }
