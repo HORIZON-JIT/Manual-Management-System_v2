@@ -55,9 +55,24 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       : ''
   );
   const [description, setDescription] = useState(initialData?.description || '');
-  const [steps, setSteps] = useState<Step[]>(
-    initialData?.steps?.length ? initialData.steps : [createEmptyStep(0)]
-  );
+  const [steps, setSteps] = useState<Step[]>(() => {
+    const initial = initialData?.steps?.length
+      ? [...initialData.steps].sort((a, b) => a.orderIndex - b.orderIndex)
+      : [createEmptyStep(0)];
+    if (initialData?.conditions?.length) {
+      let inBlock = false;
+      let currentGroup = '';
+      return initial.map(s => {
+        if (s.conditionId && !s.conditionGroup) {
+          if (!inBlock) { currentGroup = uuidv4(); inBlock = true; }
+          return { ...s, conditionGroup: currentGroup };
+        }
+        inBlock = false;
+        return s;
+      });
+    }
+    return initial;
+  });
   const [authorName, setAuthorName] = useState(
     initialData?.updatedBy || initialData?.createdBy || getLastAuthorName()
   );
@@ -93,6 +108,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   };
 
   const handleStepChange = (index: number, updatedStep: Step) => {
+    if (updatedStep.conditionId && !updatedStep.conditionGroup) {
+      updatedStep = { ...updatedStep, conditionGroup: uuidv4() };
+    }
+    if (!updatedStep.conditionId && updatedStep.conditionGroup) {
+      updatedStep = { ...updatedStep, conditionGroup: undefined };
+    }
     const newSteps = [...steps];
     newSteps[index] = updatedStep;
     setSteps(newSteps);
@@ -123,7 +144,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const removeCondition = (condId: string) => {
     setConditions(prev => prev.filter(c => c.id !== condId));
-    setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined } : s));
+    setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined, conditionGroup: undefined } : s));
   };
 
   const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
@@ -498,19 +519,41 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       {/* Steps */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-700">手順ステップ</h2>
-        {steps.map((step, index) => (
-          <StepEditor
-            key={step.id}
-            step={step}
-            index={index}
-            totalSteps={steps.length}
-            conditions={conditions}
-            onChange={(s) => handleStepChange(index, s)}
-            onRemove={() => handleRemoveStep(index)}
-            onMoveUp={() => handleMoveStep(index, 'up')}
-            onMoveDown={() => handleMoveStep(index, 'down')}
-          />
-        ))}
+        {(() => {
+          const groupOrder: string[] = [];
+          const groupCondIds = new Map<string, Set<string>>();
+          for (const s of steps) {
+            if (s.conditionGroup && s.conditionId) {
+              if (!groupCondIds.has(s.conditionGroup)) {
+                groupCondIds.set(s.conditionGroup, new Set());
+                groupOrder.push(s.conditionGroup);
+              }
+              groupCondIds.get(s.conditionGroup)!.add(s.conditionId);
+            }
+          }
+          const conditionGroupInfos = groupOrder.map((gid, idx) => {
+            const condIds = groupCondIds.get(gid)!;
+            const labels = Array.from(condIds)
+              .map(cid => conditions.find(c => c.id === cid)?.label)
+              .filter(Boolean)
+              .join(', ');
+            return { id: gid, label: `グループ ${String.fromCharCode(65 + idx)}`, description: labels };
+          });
+          return steps.map((step, index) => (
+            <StepEditor
+              key={step.id}
+              step={step}
+              index={index}
+              totalSteps={steps.length}
+              conditions={conditions}
+              conditionGroups={conditionGroupInfos}
+              onChange={(s) => handleStepChange(index, s)}
+              onRemove={() => handleRemoveStep(index)}
+              onMoveUp={() => handleMoveStep(index, 'up')}
+              onMoveDown={() => handleMoveStep(index, 'down')}
+            />
+          ));
+        })()}
 
         <button
           type="button"
