@@ -61,6 +61,23 @@ export default function StepEditor({
     });
   }, [onChange]);
 
+  const moveImage = useCallback((idx: number, direction: 'up' | 'down') => {
+    const s = stepRef.current;
+    const imgs = [...imagesRef.current];
+    const captions = [...(s.imageCaptions ?? [])];
+    while (captions.length < imgs.length) captions.push('');
+    const target = direction === 'up' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= imgs.length) return;
+    [imgs[idx], imgs[target]] = [imgs[target], imgs[idx]];
+    [captions[idx], captions[target]] = [captions[target], captions[idx]];
+    onChange({
+      ...s,
+      imageDataUrl: undefined,
+      imageDataUrls: imgs,
+      imageCaptions: captions.some(c => c) ? captions : undefined,
+    });
+  }, [onChange]);
+
   const updateCaption = useCallback((idx: number, caption: string) => {
     const captions = [...(step.imageCaptions ?? [])];
     // Ensure array is long enough
@@ -279,13 +296,37 @@ export default function StepEditor({
                     />
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">画像 {imgIdx + 1}/{images.length}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeImage(imgIdx)}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        削除
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {images.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => moveImage(imgIdx, 'up')}
+                              disabled={imgIdx === 0}
+                              className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30"
+                              title="前へ"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveImage(imgIdx, 'down')}
+                              disabled={imgIdx === images.length - 1}
+                              className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30"
+                              title="後へ"
+                            >
+                              ▼
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(imgIdx)}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          削除
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
