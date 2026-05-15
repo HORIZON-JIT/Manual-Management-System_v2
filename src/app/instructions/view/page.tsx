@@ -34,6 +34,7 @@ function InstructionViewContent() {
   const [isPreviewView, setIsPreviewView] = useState(false);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
+  const [selectedConditionId, setSelectedConditionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -146,6 +147,10 @@ function InstructionViewContent() {
   }
 
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const hasConditions = instruction.conditions && instruction.conditions.length > 0;
+  const visibleSteps = hasConditions && selectedConditionId !== null
+    ? sortedSteps.filter(s => !s.conditionId || s.conditionId === selectedConditionId)
+    : sortedSteps;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -246,9 +251,38 @@ function InstructionViewContent() {
         )}
       </div>
 
+      {/* Condition tabs */}
+      {hasConditions && (
+        <div className="flex gap-2 flex-wrap no-print">
+          <button
+            onClick={() => setSelectedConditionId(null)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+              selectedConditionId === null
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            すべて表示
+          </button>
+          {instruction.conditions!.map((cond) => (
+            <button
+              key={cond.id}
+              onClick={() => setSelectedConditionId(cond.id)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                selectedConditionId === cond.id
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {cond.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Steps */}
       <div className="space-y-4">
-        {sortedSteps.map((step, index) => (
+        {visibleSteps.map((step, index) => (
           <div
             key={step.id}
             className="bg-white rounded-xl border border-slate-200 overflow-hidden"
@@ -258,7 +292,12 @@ function InstructionViewContent() {
                 <span className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-lg font-bold text-sm shrink-0 shadow-sm">
                   {index + 1}
                 </span>
-                <h2 className="font-semibold text-slate-800">{step.title}</h2>
+                <h2 className="font-semibold text-slate-800 flex-1">{step.title}</h2>
+                {selectedConditionId === null && step.conditionId && instruction.conditions && (
+                  <span className="shrink-0 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
+                    {instruction.conditions.find(c => c.id === step.conditionId)?.label}
+                  </span>
+                )}
               </div>
             </div>
 
