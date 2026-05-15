@@ -85,6 +85,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     }
     return parents;
   });
+  const [sequential, setSequential] = useState<boolean>(initialData?.sequential ?? false);
 
   const hasRestorableVersions = isEdit && initialData?.updateHistory?.some(e => !!e.snapshot);
 
@@ -239,6 +240,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           .map(([id, parentConditionId]) => ({ id, parentConditionId }));
         return cgs.length > 0 ? cgs : undefined;
       })(),
+      sequential: sequential || undefined,
     };
   };
 
@@ -580,6 +582,24 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             </div>
           ));
         })()}
+      </div>
+
+      {/* Sequential mode toggle */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={sequential}
+            onChange={(e) => setSequential(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-700">読み飛ばし防止モード</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              ONにすると閲覧時に「次へ」ボタンで1ステップずつ表示されます
+            </p>
+          </div>
+        </label>
       </div>
 
       {/* Steps */}
