@@ -58,6 +58,11 @@ export interface UpdateHistoryEntry {
 
 export type InstructionStatus = 'draft' | 'completed';
 
+export interface ConditionGroup {
+  id: string;
+  parentConditionId?: string;
+}
+
 export interface WorkInstruction {
   id: string;
   title: string;
@@ -73,6 +78,7 @@ export interface WorkInstruction {
   keywords?: string[];
   driveFileId?: string;
   conditions?: Condition[];
+  conditionGroups?: ConditionGroup[];
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

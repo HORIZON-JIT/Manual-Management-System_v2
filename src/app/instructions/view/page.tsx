@@ -162,10 +162,27 @@ function InstructionViewContent() {
   const getStepGroup = (s: { conditionId?: string }) =>
     s.conditionId ? condGroupMap.get(s.conditionId) : undefined;
 
+  const groupMetaMap = new Map<string, { parentConditionId?: string }>();
+  for (const g of instruction.conditionGroups ?? []) {
+    groupMetaMap.set(g.id, g);
+  }
+  const isGroupVisible = (groupId: string, visited = new Set<string>()): boolean => {
+    if (visited.has(groupId)) return true;
+    visited.add(groupId);
+    const meta = groupMetaMap.get(groupId);
+    if (!meta?.parentConditionId) return true;
+    const parentGroup = condGroupMap.get(meta.parentConditionId);
+    if (!parentGroup) return true;
+    if (!isGroupVisible(parentGroup, visited)) return false;
+    const parentSel = selectedConditions[parentGroup];
+    return parentSel === null || parentSel === undefined || parentSel === meta.parentConditionId;
+  };
+
   const visibleSteps = hasConditions
     ? sortedSteps.filter(s => {
         const group = getStepGroup(s);
         if (!group) return true;
+        if (!isGroupVisible(group)) return false;
         const sel = selectedConditions[group];
         if (sel === undefined || sel === null) return true;
         return s.conditionId === sel;

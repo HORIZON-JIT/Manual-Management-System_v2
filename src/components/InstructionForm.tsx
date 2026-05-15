@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { WorkInstruction, Step, Condition, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, ConditionGroup, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet } from '@/lib/googleDrive';
@@ -78,6 +78,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     return raw.map(c => ({ ...c, group: defaultGroup }));
   });
 
+  const [groupParents, setGroupParents] = useState<Record<string, string | undefined>>(() => {
+    const parents: Record<string, string | undefined> = {};
+    for (const cg of initialData?.conditionGroups ?? []) {
+      if (cg.parentConditionId) parents[cg.id] = cg.parentConditionId;
+    }
+    return parents;
+  });
+
   const hasRestorableVersions = isEdit && initialData?.updateHistory?.some(e => !!e.snapshot);
 
   const handleRestoreVersion = (snapshot: InstructionSnapshot) => {
@@ -137,12 +145,27 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const removeCondition = (condId: string) => {
     setConditions(prev => prev.filter(c => c.id !== condId));
     setSteps(prev => prev.map(s => s.conditionId === condId ? { ...s, conditionId: undefined } : s));
+    setGroupParents(prev => {
+      const updated = { ...prev };
+      for (const [gid, pid] of Object.entries(updated)) {
+        if (pid === condId) delete updated[gid];
+      }
+      return updated;
+    });
   };
 
   const removeGroup = (groupId: string) => {
     const condIds = new Set(conditions.filter(c => c.group === groupId).map(c => c.id));
     setConditions(prev => prev.filter(c => c.group !== groupId));
     setSteps(prev => prev.map(s => condIds.has(s.conditionId ?? '') ? { ...s, conditionId: undefined } : s));
+    setGroupParents(prev => {
+      const updated = { ...prev };
+      delete updated[groupId];
+      for (const [gid, pid] of Object.entries(updated)) {
+        if (pid && condIds.has(pid)) delete updated[gid];
+      }
+      return updated;
+    });
   };
 
   const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
@@ -210,6 +233,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       status,
       keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
       conditions: conditions.length > 0 ? conditions : undefined,
+      conditionGroups: (() => {
+        const cgs = Object.entries(groupParents)
+          .filter((entry): entry is [string, string] => !!entry[1])
+          .map(([id, parentConditionId]) => ({ id, parentConditionId }));
+        return cgs.length > 0 ? cgs : undefined;
+      })(),
     };
   };
 
@@ -492,6 +521,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             if (!grouped.has(g)) { grouped.set(g, []); groupOrder.push(g); }
             grouped.get(g)!.push(c);
           }
+          const otherConditions = (gid: string) => conditions.filter(c => c.group !== gid);
           return groupOrder.map((gid, gi) => (
             <div key={gid} className="border border-blue-100 bg-blue-50/30 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
@@ -504,6 +534,21 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                   グループ削除
                 </button>
               </div>
+              {otherConditions(gid).length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 whitespace-nowrap">親条件:</label>
+                  <select
+                    value={groupParents[gid] ?? ''}
+                    onChange={(e) => setGroupParents(prev => ({ ...prev, [gid]: e.target.value || undefined }))}
+                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                  >
+                    <option value="">なし（常に表示）</option>
+                    {otherConditions(gid).map(c => (
+                      <option key={c.id} value={c.id}>{c.label || '(未入力)'}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {grouped.get(gid)!.map((cond) => (
                 <div key={cond.id} className="flex items-center gap-2">
                   <input
