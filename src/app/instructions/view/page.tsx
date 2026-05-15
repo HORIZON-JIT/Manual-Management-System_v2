@@ -34,7 +34,7 @@ function InstructionViewContent() {
   const [isPreviewView, setIsPreviewView] = useState(false);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
-  const [selectedConditionId, setSelectedConditionId] = useState<string | null>(null);
+  const [selectedConditions, setSelectedConditions] = useState<Record<number, string | null>>({});
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -148,8 +148,32 @@ function InstructionViewContent() {
 
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const hasConditions = instruction.conditions && instruction.conditions.length > 0;
-  const visibleSteps = hasConditions && selectedConditionId !== null
-    ? sortedSteps.filter(s => !s.conditionId || s.conditionId === selectedConditionId)
+
+  const conditionToZone = new Map<string, number>();
+  if (hasConditions) {
+    let zoneIndex = -1;
+    let inBlock = false;
+    for (const s of sortedSteps) {
+      if (s.conditionId) {
+        if (!inBlock) { zoneIndex++; inBlock = true; }
+        if (!conditionToZone.has(s.conditionId)) {
+          conditionToZone.set(s.conditionId, zoneIndex);
+        }
+      } else {
+        inBlock = false;
+      }
+    }
+  }
+
+  const visibleSteps = hasConditions
+    ? sortedSteps.filter(s => {
+        if (!s.conditionId) return true;
+        const zone = conditionToZone.get(s.conditionId);
+        if (zone === undefined) return true;
+        const sel = selectedConditions[zone];
+        if (sel === undefined || sel === null) return true;
+        return s.conditionId === sel;
+      })
     : sortedSteps;
 
   return (
@@ -258,29 +282,34 @@ function InstructionViewContent() {
           const isConditioned = !!step.conditionId;
           const prevWasConditioned = prevStep ? !!prevStep.conditionId : false;
           const showInlineTabs = hasConditions && isConditioned && !prevWasConditioned;
+          const zoneIndex = step.conditionId ? conditionToZone.get(step.conditionId) : undefined;
+          const zoneConditions = zoneIndex !== undefined
+            ? instruction.conditions!.filter(c => conditionToZone.get(c.id) === zoneIndex)
+            : [];
+          const zoneSel = zoneIndex !== undefined ? (selectedConditions[zoneIndex] ?? null) : null;
 
           return (
           <Fragment key={step.id}>
-            {showInlineTabs && (
+            {showInlineTabs && zoneIndex !== undefined && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
                 <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
                 <div className="flex gap-2 flex-wrap">
                   <button
-                    onClick={() => setSelectedConditionId(null)}
+                    onClick={() => setSelectedConditions(prev => ({ ...prev, [zoneIndex]: null }))}
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                      selectedConditionId === null
+                      zoneSel === null
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                   >
                     すべて表示
                   </button>
-                  {instruction.conditions!.map((cond) => (
+                  {zoneConditions.map((cond) => (
                     <button
                       key={cond.id}
-                      onClick={() => setSelectedConditionId(cond.id)}
+                      onClick={() => setSelectedConditions(prev => ({ ...prev, [zoneIndex]: cond.id }))}
                       className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                        selectedConditionId === cond.id
+                        zoneSel === cond.id
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                       }`}
@@ -300,7 +329,7 @@ function InstructionViewContent() {
                   {index + 1}
                 </span>
                 <h2 className="font-semibold text-slate-800 flex-1">{step.title}</h2>
-                {selectedConditionId === null && step.conditionId && instruction.conditions && (
+                {zoneSel === null && step.conditionId && instruction.conditions && (
                   <span className="shrink-0 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
                     {instruction.conditions.find(c => c.id === step.conditionId)?.label}
                   </span>
