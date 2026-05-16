@@ -10,6 +10,7 @@ import { downloadDriveFile } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
+import FlowchartModal from '@/components/FlowchartModal';
 
 function getYouTubeEmbedUrl(url: string): string | null {
   try {
@@ -38,6 +39,7 @@ function InstructionViewContent() {
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
   const [revealedCount, setRevealedCount] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
+  const [showFlowchart, setShowFlowchart] = useState(false);
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
 
   useEffect(() => {
@@ -273,6 +275,12 @@ function InstructionViewContent() {
             改版履歴
           </button>
         )}
+        <button
+          onClick={() => setShowFlowchart(true)}
+          className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+        >
+          フロー図
+        </button>
         {!isPreviewView && (
           <>
             <button
@@ -551,6 +559,13 @@ function InstructionViewContent() {
           createdAt={instruction.createdAt}
           onView={(snapshot) => { setViewingSnapshot(snapshot); setShowHistory(false); }}
           onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      {showFlowchart && (
+        <FlowchartModal
+          instruction={instruction}
+          onClose={() => setShowFlowchart(false)}
         />
       )}
     </div>
