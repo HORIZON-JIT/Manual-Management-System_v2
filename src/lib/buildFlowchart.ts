@@ -107,9 +107,22 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
     for (const s of regularSteps) {
       const id = nodeId(s);
-      lines.push(`  ${id}[${lbl(s)}]`);
+      const hasJumps = s.jumps && s.jumps.length > 0;
+      if (hasJumps) {
+        lines.push(`  ${id}{${dlbl(s)}}`);
+      } else {
+        lines.push(`  ${id}[${lbl(s)}]`);
+      }
       if (prev) lines.push(`  ${prev} --> ${id}`);
       if (!firstNode) firstNode = id;
+      if (hasJumps) {
+        for (const jump of s.jumps!) {
+          const targetStep = steps.find(t => t.id === jump.targetStepId);
+          if (targetStep) {
+            lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
+          }
+        }
+      }
       prev = id;
     }
 
@@ -145,8 +158,21 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   for (const seg of segments) {
     if (seg.kind === 'step') {
       const id = nodeId(seg.step);
-      lines.push(`  ${id}[${lbl(seg.step)}]`);
+      const hasJumps = seg.step.jumps && seg.step.jumps.length > 0;
+      if (hasJumps) {
+        lines.push(`  ${id}{${dlbl(seg.step)}}`);
+      } else {
+        lines.push(`  ${id}[${lbl(seg.step)}]`);
+      }
       for (const p of prev) lines.push(`  ${p} --> ${id}`);
+      if (hasJumps) {
+        for (const jump of seg.step.jumps!) {
+          const targetStep = steps.find(t => t.id === jump.targetStepId);
+          if (targetStep) {
+            lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
+          }
+        }
+      }
       prev = [id];
     } else {
       let decId: string;
@@ -182,13 +208,41 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 function buildLinear(steps: Step[]): string {
   const lines: string[] = ['graph TD', '  START(["　開始　"])'];
   let prev = 'START';
+  const stepIdMap = new Map<string, string>();
+  steps.forEach((s, i) => stepIdMap.set(s.id, `s${i}`));
+
   steps.forEach((s, i) => {
     const id = `s${i}`;
-    lines.push(`  ${id}["${esc(`${i + 1}. ${s.title}`)}"]`);
+    const hasJumps = s.jumps && s.jumps.length > 0;
+    if (hasJumps) {
+      lines.push(`  ${id}{"${esc(`${i + 1}. ${s.title}`)}"}`);
+    } else {
+      lines.push(`  ${id}["${esc(`${i + 1}. ${s.title}`)}"]`);
+    }
     lines.push(`  ${prev} --> ${id}`);
-    prev = id;
+
+    if (hasJumps) {
+      for (const jump of s.jumps!) {
+        const targetId = stepIdMap.get(jump.targetStepId);
+        if (targetId) {
+          lines.push(`  ${id} -- "${esc(jump.label)}" --> ${targetId}`);
+        }
+      }
+      const defaultLabel = s.jumpDefaultLabel || '';
+      const nextId = i < steps.length - 1 ? `s${i + 1}` : 'END';
+      if (defaultLabel) {
+        lines.push(`  ${id} -- "${esc(defaultLabel)}" --> ${nextId}`);
+      } else {
+        lines.push(`  ${id} --> ${nextId}`);
+      }
+      prev = '__skip__';
+    } else {
+      prev = id;
+    }
   });
   lines.push('  END(["　終了　"])');
-  lines.push(`  ${prev} --> END`);
+  if (prev !== '__skip__') {
+    lines.push(`  ${prev} --> END`);
+  }
   return lines.join('\n');
 }

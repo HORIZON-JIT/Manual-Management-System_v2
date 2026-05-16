@@ -12,6 +12,12 @@ export interface StepLink {
   label: string;
 }
 
+export interface StepJump {
+  id: string;
+  label: string;
+  targetStepId: string;
+}
+
 export interface Condition {
   id: string;
   label: string;
@@ -33,6 +39,8 @@ export interface Step {
   conditionId?: string;
   originalImageDataUrls?: string[];
   links?: StepLink[];
+  jumps?: StepJump[];
+  jumpDefaultLabel?: string;
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
