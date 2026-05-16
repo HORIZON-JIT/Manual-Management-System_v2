@@ -17,11 +17,12 @@ interface ViewHistoryModalProps {
   history: UpdateHistoryEntry[];
   currentTitle: string;
   currentStepCount: number;
+  createdAt: string;
   onView: (snapshot: InstructionSnapshot) => void;
   onClose: () => void;
 }
 
-export default function ViewHistoryModal({ history, currentTitle, currentStepCount, onView, onClose }: ViewHistoryModalProps) {
+export default function ViewHistoryModal({ history, currentTitle, currentStepCount, createdAt, onView, onClose }: ViewHistoryModalProps) {
   const entries = history.filter(e => !!e.snapshot);
 
   const versions: DisplayVersion[] = [];
@@ -31,8 +32,8 @@ export default function ViewHistoryModal({ history, currentTitle, currentStepCou
       versionNum: i + 1,
       snapshot: entries[i].snapshot!,
       note: i === 0 ? undefined : entries[i - 1].note,
-      updatedAt: i === 0 ? undefined : entries[i - 1].updatedAt,
-      updatedBy: i === 0 ? undefined : entries[i - 1].updatedBy,
+      updatedAt: i === 0 ? createdAt : entries[i - 1].updatedAt,
+      updatedBy: i === 0 ? entries[i].snapshot!.createdBy : entries[i - 1].updatedBy,
       isCurrent: false,
       stepCount: entries[i].snapshot!.steps.length,
       title: entries[i].snapshot!.title,

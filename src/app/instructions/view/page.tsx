@@ -520,6 +520,7 @@ function InstructionViewContent() {
           history={instruction.updateHistory}
           currentTitle={instruction.title}
           currentStepCount={instruction.steps.length}
+          createdAt={instruction.createdAt}
           onView={(snapshot) => { setViewingSnapshot(snapshot); setShowHistory(false); }}
           onClose={() => setShowHistory(false)}
         />
