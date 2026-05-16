@@ -479,6 +479,24 @@ function InstructionViewContent() {
                 </div>
               )}
 
+              {step.jumps && step.jumps.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 space-y-1.5">
+                  <p className="text-xs font-medium text-purple-700 mb-1">条件付きジャンプ</p>
+                  {step.jumps.map((jump) => {
+                    const targetStep = sortedSteps.find(s => s.id === jump.targetStepId);
+                    const targetIdx = sortedSteps.findIndex(s => s.id === jump.targetStepId);
+                    return (
+                      <p key={jump.id} className="text-sm text-purple-800">
+                        {jump.label} → ステップ {targetIdx >= 0 ? targetIdx + 1 : '?'}{targetStep ? `. ${targetStep.title}` : ''}
+                      </p>
+                    );
+                  })}
+                  {step.jumpDefaultLabel && (
+                    <p className="text-sm text-purple-600">{step.jumpDefaultLabel} → 次のステップへ</p>
+                  )}
+                </div>
+              )}
+
               {step.caution && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                   <p className="text-sm text-amber-800 font-medium flex items-center gap-1.5">
