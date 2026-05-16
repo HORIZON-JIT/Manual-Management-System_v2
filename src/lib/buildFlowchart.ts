@@ -104,6 +104,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
     let firstNode: string | null = null;
     let prev: string | null = null;
+    let branchPrevLabel: string | null = null;
 
     for (const s of regularSteps) {
       const id = nodeId(s);
@@ -113,7 +114,14 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       } else {
         lines.push(`  ${id}[${lbl(s)}]`);
       }
-      if (prev) lines.push(`  ${prev} --> ${id}`);
+      if (prev) {
+        if (branchPrevLabel) {
+          lines.push(`  ${prev} -- "${esc(branchPrevLabel)}" --> ${id}`);
+          branchPrevLabel = null;
+        } else {
+          lines.push(`  ${prev} --> ${id}`);
+        }
+      }
       if (!firstNode) firstNode = id;
       if (hasJumps) {
         for (const jump of s.jumps!) {
@@ -121,6 +129,9 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
           if (targetStep) {
             lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
           }
+        }
+        if (s.jumpDefaultLabel) {
+          branchPrevLabel = s.jumpDefaultLabel;
         }
       }
       prev = id;
@@ -154,6 +165,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   lines.push('  START(["　開始　"])');
   let prev: string[] = ['START'];
+  let prevLabel: string | null = null;
 
   for (const seg of segments) {
     if (seg.kind === 'step') {
@@ -164,13 +176,21 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       } else {
         lines.push(`  ${id}[${lbl(seg.step)}]`);
       }
-      for (const p of prev) lines.push(`  ${p} --> ${id}`);
+      if (prevLabel) {
+        for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${id}`);
+        prevLabel = null;
+      } else {
+        for (const p of prev) lines.push(`  ${p} --> ${id}`);
+      }
       if (hasJumps) {
         for (const jump of seg.step.jumps!) {
           const targetStep = steps.find(t => t.id === jump.targetStepId);
           if (targetStep) {
             lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
           }
+        }
+        if (seg.step.jumpDefaultLabel) {
+          prevLabel = seg.step.jumpDefaultLabel;
         }
       }
       prev = [id];
@@ -183,7 +203,12 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         decId = `dec${decCounter++}`;
         lines.push(`  ${decId}{"　条件　"}`);
       }
-      for (const p of prev) lines.push(`  ${p} --> ${decId}`);
+      if (prevLabel) {
+        for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${decId}`);
+        prevLabel = null;
+      } else {
+        for (const p of prev) lines.push(`  ${p} --> ${decId}`);
+      }
 
       const allExits: string[] = [];
       for (const br of seg.branches) {
@@ -200,7 +225,11 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   }
 
   lines.push('  END(["　終了　"])');
-  for (const p of prev) lines.push(`  ${p} --> END`);
+  if (prevLabel) {
+    for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> END`);
+  } else {
+    for (const p of prev) lines.push(`  ${p} --> END`);
+  }
 
   return lines.join('\n');
 }
