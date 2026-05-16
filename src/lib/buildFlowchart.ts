@@ -41,6 +41,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
   const lbl = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
+  const dlbl = (s: Step) => `"　${esc(`${stepNum.get(s.id)}. ${s.title}`)}　"`;
 
   interface GroupSegment {
     kind: 'group';
@@ -114,7 +115,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
     if (nestingStep) {
       const decId = nodeId(nestingStep);
-      lines.push(`  ${decId}{${lbl(nestingStep)}}`);
+      lines.push(`  ${decId}{${dlbl(nestingStep)}}`);
       if (prev) lines.push(`  ${prev} --> ${decId}`);
       if (!firstNode) firstNode = decId;
 
@@ -138,7 +139,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     return { firstNode, exits: prev ? [prev] : [] };
   }
 
-  lines.push('  START(["開始"])');
+  lines.push('  START(["　　開始　　"])');
   let prev: string[] = ['START'];
 
   for (const seg of segments) {
@@ -151,7 +152,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       let decId: string;
       if (seg.decisionStep) {
         decId = nodeId(seg.decisionStep);
-        lines.push(`  ${decId}{${lbl(seg.decisionStep)}}`);
+        lines.push(`  ${decId}{${dlbl(seg.decisionStep)}}`);
       } else {
         decId = `dec${decCounter++}`;
         lines.push(`  ${decId}{"条件"}`);
@@ -172,14 +173,14 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     }
   }
 
-  lines.push('  END(["終了"])');
+  lines.push('  END(["　　終了　　"])');
   for (const p of prev) lines.push(`  ${p} --> END`);
 
   return lines.join('\n');
 }
 
 function buildLinear(steps: Step[]): string {
-  const lines: string[] = ['graph TD', '  START(["開始"])'];
+  const lines: string[] = ['graph TD', '  START(["　　開始　　"])'];
   let prev = 'START';
   steps.forEach((s, i) => {
     const id = `s${i}`;
@@ -187,7 +188,7 @@ function buildLinear(steps: Step[]): string {
     lines.push(`  ${prev} --> ${id}`);
     prev = id;
   });
-  lines.push('  END(["終了"])');
+  lines.push('  END(["　　終了　　"])');
   lines.push(`  ${prev} --> END`);
   return lines.join('\n');
 }
