@@ -1,9 +1,10 @@
 'use client';
 
 import { Step, CheckItem, Condition, getStepImages } from '@/types/instruction';
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { compressImage } from '@/lib/compressImage';
+import ImageAnnotationEditor from './ImageAnnotationEditor';
 
 interface StepEditorProps {
   step: Step;
@@ -28,6 +29,7 @@ export default function StepEditor({
 }: StepEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
 
   const images = getStepImages(step);
 
@@ -321,6 +323,13 @@ export default function StepEditor({
                         )}
                         <button
                           type="button"
+                          onClick={() => setAnnotatingIdx(imgIdx)}
+                          className="text-xs text-purple-500 hover:text-purple-700"
+                        >
+                          注釈
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => removeImage(imgIdx)}
                           className="text-xs text-red-500 hover:text-red-700"
                         >
@@ -418,6 +427,44 @@ export default function StepEditor({
           </button>
         </div>
       </div>
+      {annotatingIdx !== null && (
+        <ImageAnnotationEditor
+          imageDataUrl={images[annotatingIdx]}
+          originalImageDataUrl={step.originalImageDataUrls?.[annotatingIdx]}
+          onSave={(url) => {
+            const updated = [...images];
+            const originals = [...(step.originalImageDataUrls ?? [])];
+            while (originals.length <= annotatingIdx) originals.push('');
+            if (!originals[annotatingIdx]) {
+              originals[annotatingIdx] = images[annotatingIdx];
+            }
+            updated[annotatingIdx] = url;
+            onChange({
+              ...step,
+              imageDataUrl: undefined,
+              imageDataUrls: updated,
+              originalImageDataUrls: originals,
+            });
+            setAnnotatingIdx(null);
+          }}
+          onRestore={() => {
+            const originals = step.originalImageDataUrls ?? [];
+            if (!originals[annotatingIdx]) return;
+            const updated = [...images];
+            updated[annotatingIdx] = originals[annotatingIdx];
+            const newOriginals = [...originals];
+            newOriginals[annotatingIdx] = '';
+            onChange({
+              ...step,
+              imageDataUrl: undefined,
+              imageDataUrls: updated,
+              originalImageDataUrls: newOriginals.some(o => o) ? newOriginals : undefined,
+            });
+            setAnnotatingIdx(null);
+          }}
+          onClose={() => setAnnotatingIdx(null)}
+        />
+      )}
     </div>
   );
 }

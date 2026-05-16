@@ -515,6 +515,12 @@ function InstructionViewContent() {
         })}
       </div>
 
+      {(!isSequential || revealedCount >= visibleSteps.length) && (
+        <div className="text-center py-6">
+          <p className="text-sm font-medium text-emerald-600">全ステップ完了</p>
+        </div>
+      )}
+
       {showHistory && instruction.updateHistory && (
         <ViewHistoryModal
           history={instruction.updateHistory}
