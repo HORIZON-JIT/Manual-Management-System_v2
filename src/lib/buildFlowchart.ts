@@ -79,13 +79,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     segments.push({ kind: 'group', decisionStep, branches });
   }
 
-  const lines: string[] = [
-    '---',
-    'config:',
-    '  layout: elk',
-    '---',
-    'graph TD',
-  ];
+  const lines: string[] = ['graph TD'];
   let nodeCounter = 0;
   let decCounter = 0;
   const nid = new Map<string, string>();
@@ -185,10 +179,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 }
 
 function buildLinear(steps: Step[]): string {
-  const lines: string[] = [
-    '---', 'config:', '  layout: elk', '---',
-    'graph TD', '  START(["開始"])',
-  ];
+  const lines: string[] = ['graph TD', '  START(["開始"])'];
   let prev = 'START';
   steps.forEach((s, i) => {
     const id = `s${i}`;
