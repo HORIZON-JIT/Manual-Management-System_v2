@@ -13,6 +13,19 @@ export default function HomePage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
+  const [version, setVersion] = useState('');
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/HORIZON-JIT/FC/pulls?state=closed&per_page=1', {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+    })
+      .then(res => {
+        const link = res.headers.get('Link') ?? '';
+        const match = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+        if (match) setVersion(`1.0.${match[1]}`);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!importError) return;
@@ -165,6 +178,12 @@ export default function HomePage() {
         onClose={() => setShowPreviewPicker(false)}
         onFileLoaded={handlePreviewFileLoaded}
       />
+
+      <footer className="mt-16 text-right text-xs text-gray-300 select-none">
+        <p>作業手順書システム</p>
+        {version && <p>Version {version}</p>}
+        <p>Developed by Yuma Tani</p>
+      </footer>
     </div>
   );
 }
