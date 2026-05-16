@@ -11,14 +11,16 @@ type Tool = 'arrow' | 'circle' | 'number';
 
 interface ImageAnnotationEditorProps {
   imageDataUrl: string;
+  originalImageDataUrl?: string;
   onSave: (annotatedDataUrl: string) => void;
+  onRestore: () => void;
   onClose: () => void;
 }
 
 const ANNOTATION_COLOR = '#EF4444';
 const OUTLINE_COLOR = '#FFFFFF';
 
-export default function ImageAnnotationEditor({ imageDataUrl, onSave, onClose }: ImageAnnotationEditorProps) {
+export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataUrl, onSave, onRestore, onClose }: ImageAnnotationEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [tool, setTool] = useState<Tool>('circle');
@@ -212,12 +214,24 @@ export default function ImageAnnotationEditor({ imageDataUrl, onSave, onClose }:
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900">
-        <button
-          onClick={handleReset}
-          className="px-3 py-1.5 text-sm text-gray-300 hover:text-white transition"
-        >
-          リセット
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            className="px-3 py-1.5 text-sm text-gray-300 hover:text-white transition"
+          >
+            リセット
+          </button>
+          {originalImageDataUrl && (
+            <button
+              onClick={() => {
+                if (confirm('注釈を全て削除して元画像に戻しますか？')) onRestore();
+              }}
+              className="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 transition"
+            >
+              元画像に戻す
+            </button>
+          )}
+        </div>
         <span className="text-sm text-gray-400">画像注釈</span>
         <button
           onClick={handleSave}

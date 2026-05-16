@@ -430,10 +430,36 @@ export default function StepEditor({
       {annotatingIdx !== null && (
         <ImageAnnotationEditor
           imageDataUrl={images[annotatingIdx]}
+          originalImageDataUrl={step.originalImageDataUrls?.[annotatingIdx]}
           onSave={(url) => {
             const updated = [...images];
+            const originals = [...(step.originalImageDataUrls ?? [])];
+            while (originals.length <= annotatingIdx) originals.push('');
+            if (!originals[annotatingIdx]) {
+              originals[annotatingIdx] = images[annotatingIdx];
+            }
             updated[annotatingIdx] = url;
-            onChange({ ...step, imageDataUrl: undefined, imageDataUrls: updated });
+            onChange({
+              ...step,
+              imageDataUrl: undefined,
+              imageDataUrls: updated,
+              originalImageDataUrls: originals,
+            });
+            setAnnotatingIdx(null);
+          }}
+          onRestore={() => {
+            const originals = step.originalImageDataUrls ?? [];
+            if (!originals[annotatingIdx]) return;
+            const updated = [...images];
+            updated[annotatingIdx] = originals[annotatingIdx];
+            const newOriginals = [...originals];
+            newOriginals[annotatingIdx] = '';
+            onChange({
+              ...step,
+              imageDataUrl: undefined,
+              imageDataUrls: updated,
+              originalImageDataUrls: newOriginals.some(o => o) ? newOriginals : undefined,
+            });
             setAnnotatingIdx(null);
           }}
           onClose={() => setAnnotatingIdx(null)}

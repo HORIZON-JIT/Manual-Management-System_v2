@@ -22,6 +22,7 @@ export interface Step {
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
+  originalImageDataUrls?: string[];
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
