@@ -449,7 +449,9 @@ function InstructionViewContent() {
                   <p className="text-xs font-medium text-indigo-700 mb-1">関連リンク</p>
                   {step.links.map((link) => {
                     const href = link.type === 'instruction'
-                      ? `/instructions/view?id=${link.instructionId}`
+                      ? link.driveFileId
+                        ? `/instructions/view?driveFileId=${link.driveFileId}`
+                        : `/instructions/view?id=${link.instructionId}`
                       : link.url;
                     return (
                       <a

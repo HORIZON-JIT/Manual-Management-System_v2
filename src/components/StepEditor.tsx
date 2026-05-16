@@ -409,7 +409,7 @@ export default function StepEditor({
                 const all = getAllInstructions();
                 const inst = all.find(i => i.id === e.target.value);
                 if (!inst) return;
-                const newLink: StepLink = { id: uuidv4(), type: 'instruction', instructionId: inst.id, label: inst.title };
+                const newLink: StepLink = { id: uuidv4(), type: 'instruction', instructionId: inst.id, driveFileId: inst.driveFileId, label: inst.title };
                 onChange({ ...step, links: [...(step.links ?? []), newLink] });
                 e.target.value = '';
               }}

@@ -7,6 +7,7 @@ export interface StepLink {
   id: string;
   type: 'instruction' | 'url';
   instructionId?: string;
+  driveFileId?: string;
   url?: string;
   label: string;
 }
