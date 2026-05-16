@@ -183,7 +183,11 @@ function InstructionViewContent() {
     if (!parentGroup) return true;
     if (!isGroupVisible(parentGroup, visited)) return false;
     const parentSel = selectedConditions[parentGroup];
-    return parentSel === null || parentSel === undefined || parentSel === meta.parentConditionId;
+    if (parentSel === null || parentSel === undefined) {
+      const firstCond = groupConditions.get(parentGroup)?.[0];
+      return firstCond ? firstCond.id === meta.parentConditionId : true;
+    }
+    return parentSel === meta.parentConditionId;
   };
 
   const visibleSteps = hasConditions
@@ -192,7 +196,10 @@ function InstructionViewContent() {
         if (!group) return true;
         if (!isGroupVisible(group)) return false;
         const sel = selectedConditions[group];
-        if (sel === undefined || sel === null) return true;
+        if (sel === undefined || sel === null) {
+          const firstCond = groupConditions.get(group)?.[0];
+          return firstCond ? s.conditionId === firstCond.id : true;
+        }
         return s.conditionId === sel;
       })
     : sortedSteps;
@@ -354,29 +361,22 @@ function InstructionViewContent() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
                 <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
                 <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => { setSelectedConditions(prev => ({ ...prev, [group]: null })); setRevealedCount(1); }}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                      zoneSel === null
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                    }`}
-                  >
-                    すべて表示
-                  </button>
-                  {zoneConds.map((cond) => (
+                  {zoneConds.map((cond, condIdx) => {
+                    const isActive = zoneSel === cond.id || (zoneSel === null && condIdx === 0);
+                    return (
                     <button
                       key={cond.id}
                       onClick={() => { setSelectedConditions(prev => ({ ...prev, [group]: cond.id })); setRevealedCount(1); }}
                       className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                        zoneSel === cond.id
+                        isActive
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                       }`}
                     >
                       {cond.label}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -389,11 +389,6 @@ function InstructionViewContent() {
                   {stepNumbers[index]}
                 </span>
                 <h2 className="font-semibold text-slate-800 flex-1">{step.title}</h2>
-                {zoneSel === null && step.conditionId && instruction.conditions && (
-                  <span className="shrink-0 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
-                    {instruction.conditions.find(c => c.id === step.conditionId)?.label}
-                  </span>
-                )}
               </div>
             </div>
 
