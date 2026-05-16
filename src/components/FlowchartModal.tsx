@@ -22,8 +22,6 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
       try {
         const mermaidModule = await import('mermaid');
         const mermaid = mermaidModule.default;
-        const elkModule = await import('@mermaid-js/layout-elk');
-        mermaid.registerLayoutLoaders(elkModule.default);
 
         mermaid.initialize({
           startOnLoad: false,
