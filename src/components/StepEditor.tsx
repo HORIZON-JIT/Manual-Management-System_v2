@@ -33,6 +33,9 @@ export default function StepEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
+  const [showJumpForm, setShowJumpForm] = useState(false);
+  const [jumpLabel, setJumpLabel] = useState('');
+  const [jumpTargetId, setJumpTargetId] = useState('');
 
   const images = getStepImages(step);
 
@@ -473,30 +476,63 @@ export default function StepEditor({
                 />
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                const label = prompt('ジャンプのラベルを入力（例: NG、不合格）');
-                if (!label) return;
-                const otherSteps = allSteps.filter(s => s.id !== step.id);
-                if (otherSteps.length === 0) return;
-                const options = otherSteps.map((s, i) => {
-                  const realIdx = allSteps.findIndex(a => a.id === s.id);
-                  return `${realIdx + 1}. ${s.title || '(未入力)'}`;
-                }).join('\n');
-                const chosen = prompt(`ジャンプ先ステップ番号を入力:\n${options}`);
-                if (!chosen) return;
-                const targetNum = parseInt(chosen, 10);
-                if (isNaN(targetNum) || targetNum < 1 || targetNum > allSteps.length) return;
-                const targetStep = allSteps[targetNum - 1];
-                if (targetStep.id === step.id) return;
-                const newJump: StepJump = { id: uuidv4(), label, targetStepId: targetStep.id };
-                onChange({ ...step, jumps: [...(step.jumps ?? []), newJump] });
-              }}
-              className="text-sm text-blue-600 hover:text-blue-800 mt-1"
-            >
-              + ジャンプを追加
-            </button>
+            {showJumpForm ? (
+              <div className="mt-1 p-2 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                <input
+                  type="text"
+                  value={jumpLabel}
+                  onChange={(e) => setJumpLabel(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="ラベル（例: NG、不合格）"
+                />
+                <select
+                  value={jumpTargetId}
+                  onChange={(e) => setJumpTargetId(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                >
+                  <option value="">ジャンプ先を選択...</option>
+                  {allSteps.filter(s => s.id !== step.id).map((s) => {
+                    const realIdx = allSteps.findIndex(a => a.id === s.id);
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {realIdx + 1}. {s.title || '(未入力)'}
+                      </option>
+                    );
+                  })}
+                </select>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!jumpLabel.trim() || !jumpTargetId}
+                    onClick={() => {
+                      const newJump: StepJump = { id: uuidv4(), label: jumpLabel.trim(), targetStepId: jumpTargetId };
+                      onChange({ ...step, jumps: [...(step.jumps ?? []), newJump] });
+                      setJumpLabel('');
+                      setJumpTargetId('');
+                      setShowJumpForm(false);
+                    }}
+                    className="px-3 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition disabled:opacity-50"
+                  >
+                    追加
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowJumpForm(false); setJumpLabel(''); setJumpTargetId(''); }}
+                    className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowJumpForm(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 mt-1"
+              >
+                + ジャンプを追加
+              </button>
+            )}
           </div>
         )}
 
