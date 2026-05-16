@@ -139,7 +139,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     return { firstNode, exits: prev ? [prev] : [] };
   }
 
-  lines.push('  START(["　　開始　　"])');
+  lines.push('  START(["　開始　"])');
   let prev: string[] = ['START'];
 
   for (const seg of segments) {
@@ -155,7 +155,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         lines.push(`  ${decId}{${dlbl(seg.decisionStep)}}`);
       } else {
         decId = `dec${decCounter++}`;
-        lines.push(`  ${decId}{"条件"}`);
+        lines.push(`  ${decId}{"　条件　"}`);
       }
       for (const p of prev) lines.push(`  ${p} --> ${decId}`);
 
@@ -173,14 +173,14 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     }
   }
 
-  lines.push('  END(["　　終了　　"])');
+  lines.push('  END(["　終了　"])');
   for (const p of prev) lines.push(`  ${p} --> END`);
 
   return lines.join('\n');
 }
 
 function buildLinear(steps: Step[]): string {
-  const lines: string[] = ['graph TD', '  START(["　　開始　　"])'];
+  const lines: string[] = ['graph TD', '  START(["　開始　"])'];
   let prev = 'START';
   steps.forEach((s, i) => {
     const id = `s${i}`;
@@ -188,7 +188,7 @@ function buildLinear(steps: Step[]): string {
     lines.push(`  ${prev} --> ${id}`);
     prev = id;
   });
-  lines.push('  END(["　　終了　　"])');
+  lines.push('  END(["　終了　"])');
   lines.push(`  ${prev} --> END`);
   return lines.join('\n');
 }
