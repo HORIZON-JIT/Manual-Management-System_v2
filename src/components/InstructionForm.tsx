@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkInstruction, Step, Condition, ConditionGroup, DEFAULT_CATEGORIES, UpdateHistoryEntry, InstructionSnapshot, InstructionStatus } from '@/types/instruction';
@@ -107,6 +107,12 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const handleAddStep = () => {
     setSteps([...steps, createEmptyStep(steps.length)]);
+  };
+
+  const handleInsertStep = (afterIndex: number) => {
+    const newSteps = [...steps];
+    newSteps.splice(afterIndex + 1, 0, createEmptyStep(afterIndex + 1));
+    setSteps(newSteps.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
   const handleStepChange = (index: number, updatedStep: Step) => {
@@ -606,17 +612,27 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-700">手順ステップ</h2>
         {steps.map((step, index) => (
-          <StepEditor
-            key={step.id}
-            step={step}
-            index={index}
-            totalSteps={steps.length}
-            conditions={conditions}
-            onChange={(s) => handleStepChange(index, s)}
-            onRemove={() => handleRemoveStep(index)}
-            onMoveUp={() => handleMoveStep(index, 'up')}
-            onMoveDown={() => handleMoveStep(index, 'down')}
-          />
+          <Fragment key={step.id}>
+            <StepEditor
+              step={step}
+              index={index}
+              totalSteps={steps.length}
+              conditions={conditions}
+              onChange={(s) => handleStepChange(index, s)}
+              onRemove={() => handleRemoveStep(index)}
+              onMoveUp={() => handleMoveStep(index, 'up')}
+              onMoveDown={() => handleMoveStep(index, 'down')}
+            />
+            {index < steps.length - 1 && (
+              <button
+                type="button"
+                onClick={() => handleInsertStep(index)}
+                className="w-full py-1.5 border-2 border-dashed border-transparent hover:border-blue-300 rounded-lg text-gray-300 hover:text-blue-500 transition text-sm"
+              >
+                + ここにステップを挿入
+              </button>
+            )}
+          </Fragment>
         ))}
 
         <button
