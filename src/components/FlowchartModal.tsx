@@ -22,12 +22,20 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
       try {
         const mermaidModule = await import('mermaid');
         const mermaid = mermaidModule.default;
+        const elkModule = await import('@mermaid-js/layout-elk');
+        mermaid.registerLayoutLoaders(elkModule.default);
 
         mermaid.initialize({
           startOnLoad: false,
           theme: 'default',
-          flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
-        });
+          layout: 'elk',
+          elk: { mergeEdges: true },
+          flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true,
+            curve: 'linear',
+          },
+        } as Parameters<typeof mermaid.initialize>[0]);
 
         const definition = buildFlowchartDefinition(instruction);
         const { svg } = await mermaid.render(`fc-${Date.now()}`, definition);
