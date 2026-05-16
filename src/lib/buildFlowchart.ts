@@ -41,7 +41,6 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
   const lbl = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
-  const dlbl = (s: Step) => `"　${esc(`${stepNum.get(s.id)}. ${s.title}`)}　"`;
 
   interface GroupSegment {
     kind: 'group';
@@ -81,6 +80,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   }
 
   const lines: string[] = ['graph TD'];
+  const decisionNodes: string[] = [];
   let nodeCounter = 0;
   let decCounter = 0;
   const nid = new Map<string, string>();
@@ -115,7 +115,8 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
     if (nestingStep) {
       const decId = nodeId(nestingStep);
-      lines.push(`  ${decId}{${dlbl(nestingStep)}}`);
+      lines.push(`  ${decId}[${lbl(nestingStep)}]`);
+      decisionNodes.push(decId);
       if (prev) lines.push(`  ${prev} --> ${decId}`);
       if (!firstNode) firstNode = decId;
 
@@ -139,7 +140,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     return { firstNode, exits: prev ? [prev] : [] };
   }
 
-  lines.push('  START(["　　開始　　"])');
+  lines.push('  START["開始"]');
   let prev: string[] = ['START'];
 
   for (const seg of segments) {
@@ -152,11 +153,12 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       let decId: string;
       if (seg.decisionStep) {
         decId = nodeId(seg.decisionStep);
-        lines.push(`  ${decId}{${dlbl(seg.decisionStep)}}`);
+        lines.push(`  ${decId}[${lbl(seg.decisionStep)}]`);
       } else {
         decId = `dec${decCounter++}`;
-        lines.push(`  ${decId}{"条件"}`);
+        lines.push(`  ${decId}["条件"]`);
       }
+      decisionNodes.push(decId);
       for (const p of prev) lines.push(`  ${p} --> ${decId}`);
 
       const allExits: string[] = [];
@@ -173,14 +175,21 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     }
   }
 
-  lines.push('  END(["　　終了　　"])');
+  lines.push('  END["終了"]');
   for (const p of prev) lines.push(`  ${p} --> END`);
+
+  lines.push('  classDef startEnd fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,rx:20,ry:20');
+  lines.push('  classDef decision fill:#fef3c7,stroke:#f59e0b,stroke-width:2px');
+  lines.push('  class START,END startEnd');
+  if (decisionNodes.length > 0) {
+    lines.push(`  class ${decisionNodes.join(',')} decision`);
+  }
 
   return lines.join('\n');
 }
 
 function buildLinear(steps: Step[]): string {
-  const lines: string[] = ['graph TD', '  START(["　　開始　　"])'];
+  const lines: string[] = ['graph TD', '  START["開始"]'];
   let prev = 'START';
   steps.forEach((s, i) => {
     const id = `s${i}`;
@@ -188,7 +197,9 @@ function buildLinear(steps: Step[]): string {
     lines.push(`  ${prev} --> ${id}`);
     prev = id;
   });
-  lines.push('  END(["　　終了　　"])');
+  lines.push('  END["終了"]');
   lines.push(`  ${prev} --> END`);
+  lines.push('  classDef startEnd fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,rx:20,ry:20');
+  lines.push('  class START,END startEnd');
   return lines.join('\n');
 }
