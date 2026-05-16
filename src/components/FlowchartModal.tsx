@@ -28,7 +28,7 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
           theme: 'default',
           flowchart: {
             useMaxWidth: true,
-            htmlLabels: true,
+            htmlLabels: false,
             curve: 'linear',
             padding: 15,
           },
