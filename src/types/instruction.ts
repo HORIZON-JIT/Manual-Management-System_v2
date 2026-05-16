@@ -3,6 +3,14 @@ export interface CheckItem {
   label: string;
 }
 
+export interface StepLink {
+  id: string;
+  type: 'instruction' | 'url';
+  instructionId?: string;
+  url?: string;
+  label: string;
+}
+
 export interface Condition {
   id: string;
   label: string;
@@ -23,6 +31,7 @@ export interface Step {
   checkItems?: CheckItem[];
   conditionId?: string;
   originalImageDataUrls?: string[];
+  links?: StepLink[];
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */

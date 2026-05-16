@@ -1,8 +1,9 @@
 'use client';
 
-import { Step, CheckItem, Condition, getStepImages } from '@/types/instruction';
+import { Step, CheckItem, StepLink, Condition, getStepImages } from '@/types/instruction';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
 import ImageAnnotationEditor from './ImageAnnotationEditor';
 
@@ -382,6 +383,57 @@ export default function StepEditor({
             className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             placeholder="https://www.youtube.com/watch?v=..."
           />
+        </div>
+
+        {/* Related links */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">関連リンク（任意）</label>
+          {(step.links ?? []).map((link) => (
+            <div key={link.id} className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs text-gray-400">{link.type === 'instruction' ? '📄' : '🔗'}</span>
+              <span className="flex-1 text-sm text-gray-700 truncate">{link.label}</span>
+              <button
+                type="button"
+                onClick={() => onChange({ ...step, links: (step.links ?? []).filter(l => l.id !== link.id) })}
+                className="text-red-400 hover:text-red-600 text-xs"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-2 flex-wrap mt-1">
+            <select
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                const all = getAllInstructions();
+                const inst = all.find(i => i.id === e.target.value);
+                if (!inst) return;
+                const newLink: StepLink = { id: uuidv4(), type: 'instruction', instructionId: inst.id, label: inst.title };
+                onChange({ ...step, links: [...(step.links ?? []), newLink] });
+                e.target.value = '';
+              }}
+              className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
+            >
+              <option value="">+ 手順書を追加...</option>
+              {getAllInstructions().map(inst => (
+                <option key={inst.id} value={inst.id}>{inst.title}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const url = prompt('URLを入力してください');
+                if (!url) return;
+                const label = prompt('リンクの表示名を入力してください', url) || url;
+                const newLink: StepLink = { id: uuidv4(), type: 'url', url, label };
+                onChange({ ...step, links: [...(step.links ?? []), newLink] });
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              + URLを追加
+            </button>
+          </div>
         </div>
 
         {/* Check items */}

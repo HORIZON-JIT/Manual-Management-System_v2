@@ -444,6 +444,31 @@ function InstructionViewContent() {
                 </div>
               )}
 
+              {step.links && step.links.length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 space-y-1.5">
+                  <p className="text-xs font-medium text-indigo-700 mb-1">関連リンク</p>
+                  {step.links.map((link) => {
+                    const href = link.type === 'instruction'
+                      ? `/instructions/view?id=${link.instructionId}`
+                      : link.url;
+                    return (
+                      <a
+                        key={link.id}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 transition"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        {link.label}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+
               {step.caution && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                   <p className="text-sm text-amber-800 font-medium flex items-center gap-1.5">
