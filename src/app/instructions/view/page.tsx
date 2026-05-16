@@ -518,6 +518,8 @@ function InstructionViewContent() {
       {showHistory && instruction.updateHistory && (
         <ViewHistoryModal
           history={instruction.updateHistory}
+          currentTitle={instruction.title}
+          currentStepCount={instruction.steps.length}
           onView={(snapshot) => { setViewingSnapshot(snapshot); setShowHistory(false); }}
           onClose={() => setShowHistory(false)}
         />
