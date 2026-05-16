@@ -26,14 +26,28 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     groupParent.set(g.id, g.parentConditionId);
   }
 
+  const nestedGroupsByParentCond = new Map<string, string[]>();
+  for (const [gid, parentCondId] of groupParent) {
+    if (parentCondId) {
+      if (!nestedGroupsByParentCond.has(parentCondId))
+        nestedGroupsByParentCond.set(parentCondId, []);
+      nestedGroupsByParentCond.get(parentCondId)!.push(gid);
+    }
+  }
+
+  const isNestedGroup = (gid: string) => !!groupParent.get(gid);
+
   const stepNum = new Map<string, number>();
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
-  const label = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
+  const lbl = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
 
-  type Segment =
-    | { kind: 'step'; step: Step }
-    | { kind: 'group'; groupId: string; branches: { cond: Condition; steps: Step[] }[] };
+  interface GroupSegment {
+    kind: 'group';
+    decisionStep?: Step;
+    branches: { cond: Condition; steps: Step[] }[];
+  }
+  type Segment = { kind: 'step'; step: Step } | GroupSegment;
 
   const segments: Segment[] = [];
   const groupsSeen = new Set<string>();
@@ -44,16 +58,25 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       segments.push({ kind: 'step', step });
       continue;
     }
-
     if (groupsSeen.has(gid)) continue;
     groupsSeen.add(gid);
+    if (isNestedGroup(gid)) continue;
 
     const condsInGroup = groupConds.get(gid) ?? [];
     const branches = condsInGroup.map(c => ({
       cond: c,
       steps: steps.filter(s => s.conditionId === c.id),
     }));
-    segments.push({ kind: 'group', groupId: gid, branches });
+
+    const hasSteps = branches.some(b => b.steps.length > 0);
+    if (!hasSteps) continue;
+
+    let decisionStep: Step | undefined;
+    if (segments.length > 0 && segments[segments.length - 1].kind === 'step') {
+      decisionStep = (segments.pop() as { kind: 'step'; step: Step }).step;
+    }
+
+    segments.push({ kind: 'group', decisionStep, branches });
   }
 
   const lines: string[] = ['graph TD'];
@@ -66,21 +89,53 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     return nid.get(s.id)!;
   }
 
-  function declareStep(s: Step): void {
-    const id = nodeId(s);
-    lines.push(`  ${id}[${label(s)}]`);
-  }
+  function emitBranch(
+    branchSteps: Step[],
+    conditionId: string,
+  ): { firstNode: string | null; exits: string[] } {
+    if (branchSteps.length === 0) return { firstNode: null, exits: [] };
 
-  function emitBranchSteps(branchSteps: Step[]): string | null {
-    if (branchSteps.length === 0) return null;
+    const childGroupIds = nestedGroupsByParentCond.get(conditionId) ?? [];
+    const hasNesting = childGroupIds.length > 0;
+
+    const regularSteps = hasNesting ? branchSteps.slice(0, -1) : branchSteps;
+    const nestingStep = hasNesting ? branchSteps[branchSteps.length - 1] : null;
+
+    let firstNode: string | null = null;
     let prev: string | null = null;
-    for (const s of branchSteps) {
-      declareStep(s);
+
+    for (const s of regularSteps) {
       const id = nodeId(s);
+      lines.push(`  ${id}[${lbl(s)}]`);
       if (prev) lines.push(`  ${prev} --> ${id}`);
+      if (!firstNode) firstNode = id;
       prev = id;
     }
-    return prev;
+
+    if (nestingStep) {
+      const decId = nodeId(nestingStep);
+      lines.push(`  ${decId}{${lbl(nestingStep)}}`);
+      if (prev) lines.push(`  ${prev} --> ${decId}`);
+      if (!firstNode) firstNode = decId;
+
+      const nestedConds = groupConds.get(childGroupIds[0]) ?? [];
+      const allExits: string[] = [];
+
+      for (const nc of nestedConds) {
+        const nestedSteps = steps.filter(s => s.conditionId === nc.id);
+        const result = emitBranch(nestedSteps, nc.id);
+        if (result.firstNode) {
+          lines.push(`  ${decId} -- "${esc(nc.label)}" --> ${result.firstNode}`);
+          allExits.push(...result.exits);
+        } else {
+          allExits.push(decId);
+        }
+      }
+
+      return { firstNode, exits: allExits.length > 0 ? allExits : [decId] };
+    }
+
+    return { firstNode, exits: prev ? [prev] : [] };
   }
 
   lines.push('  START(["開始"])');
@@ -88,27 +143,32 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   for (const seg of segments) {
     if (seg.kind === 'step') {
-      declareStep(seg.step);
       const id = nodeId(seg.step);
+      lines.push(`  ${id}[${lbl(seg.step)}]`);
       for (const p of prev) lines.push(`  ${p} --> ${id}`);
       prev = [id];
     } else {
-      const decId = `dec${decCounter++}`;
-      const groupLabel = seg.groupId === '__default' ? '条件' : seg.groupId;
-      lines.push(`  ${decId}{"${esc(groupLabel)}"}`);
+      let decId: string;
+      if (seg.decisionStep) {
+        decId = nodeId(seg.decisionStep);
+        lines.push(`  ${decId}{${lbl(seg.decisionStep)}}`);
+      } else {
+        decId = `dec${decCounter++}`;
+        lines.push(`  ${decId}{"条件"}`);
+      }
       for (const p of prev) lines.push(`  ${p} --> ${decId}`);
 
-      const exits: string[] = [];
+      const allExits: string[] = [];
       for (const br of seg.branches) {
-        const lastId = emitBranchSteps(br.steps);
-        if (lastId) {
-          lines.push(`  ${decId} -- "${esc(br.cond.label)}" --> ${nodeId(br.steps[0])}`);
-          exits.push(lastId);
+        const result = emitBranch(br.steps, br.cond.id);
+        if (result.firstNode) {
+          lines.push(`  ${decId} -- "${esc(br.cond.label)}" --> ${result.firstNode}`);
+          allExits.push(...result.exits);
         } else {
-          exits.push(decId);
+          allExits.push(decId);
         }
       }
-      prev = exits;
+      prev = allExits.length > 0 ? allExits : [decId];
     }
   }
 
