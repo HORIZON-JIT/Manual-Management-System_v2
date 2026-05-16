@@ -143,6 +143,15 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       if (prev) lines.push(`  ${prev} --> ${decId}`);
       if (!firstNode) firstNode = decId;
 
+      if (nestingStep.jumps && nestingStep.jumps.length > 0) {
+        for (const jump of nestingStep.jumps) {
+          const targetStep = steps.find(t => t.id === jump.targetStepId);
+          if (targetStep) {
+            lines.push(`  ${decId} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
+          }
+        }
+      }
+
       const nestedConds = groupConds.get(childGroupIds[0]) ?? [];
       const allExits: string[] = [];
 
@@ -208,6 +217,15 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         prevLabel = null;
       } else {
         for (const p of prev) lines.push(`  ${p} --> ${decId}`);
+      }
+
+      if (seg.decisionStep?.jumps && seg.decisionStep.jumps.length > 0) {
+        for (const jump of seg.decisionStep.jumps) {
+          const targetStep = steps.find(t => t.id === jump.targetStepId);
+          if (targetStep) {
+            lines.push(`  ${decId} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
+          }
+        }
       }
 
       const allExits: string[] = [];
