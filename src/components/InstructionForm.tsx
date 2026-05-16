@@ -618,6 +618,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               index={index}
               totalSteps={steps.length}
               conditions={conditions}
+              allSteps={steps}
               onChange={(s) => handleStepChange(index, s)}
               onRemove={() => handleRemoveStep(index)}
               onMoveUp={() => handleMoveStep(index, 'up')}

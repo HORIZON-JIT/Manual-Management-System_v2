@@ -1,6 +1,6 @@
 'use client';
 
-import { Step, CheckItem, StepLink, Condition, getStepImages } from '@/types/instruction';
+import { Step, CheckItem, StepLink, StepJump, Condition, getStepImages } from '@/types/instruction';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { getAllInstructions } from '@/lib/storage';
@@ -12,6 +12,7 @@ interface StepEditorProps {
   index: number;
   totalSteps: number;
   conditions?: Condition[];
+  allSteps?: Step[];
   onChange: (step: Step) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -23,6 +24,7 @@ export default function StepEditor({
   index,
   totalSteps,
   conditions,
+  allSteps,
   onChange,
   onRemove,
   onMoveUp,
@@ -435,6 +437,68 @@ export default function StepEditor({
             </button>
           </div>
         </div>
+
+        {/* Conditional jumps */}
+        {allSteps && allSteps.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">条件付きジャンプ（任意）</label>
+            {(step.jumps ?? []).map((jump) => {
+              const targetStep = allSteps.find(s => s.id === jump.targetStepId);
+              const targetIdx = allSteps.findIndex(s => s.id === jump.targetStepId);
+              return (
+                <div key={jump.id} className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs text-gray-400">↗</span>
+                  <span className="flex-1 text-sm text-gray-700 truncate">
+                    {jump.label} → {targetIdx >= 0 ? `${targetIdx + 1}. ${targetStep!.title || '(未入力)'}` : '(不明)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...step, jumps: (step.jumps ?? []).filter(j => j.id !== jump.id) })}
+                    className="text-red-400 hover:text-red-600 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            {(step.jumps ?? []).length > 0 && (
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-0.5">通常進行ラベル</label>
+                <input
+                  type="text"
+                  value={step.jumpDefaultLabel || ''}
+                  onChange={(e) => onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })}
+                  className="w-48 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="例: OK、合格"
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const label = prompt('ジャンプのラベルを入力（例: NG、不合格）');
+                if (!label) return;
+                const otherSteps = allSteps.filter(s => s.id !== step.id);
+                if (otherSteps.length === 0) return;
+                const options = otherSteps.map((s, i) => {
+                  const realIdx = allSteps.findIndex(a => a.id === s.id);
+                  return `${realIdx + 1}. ${s.title || '(未入力)'}`;
+                }).join('\n');
+                const chosen = prompt(`ジャンプ先ステップ番号を入力:\n${options}`);
+                if (!chosen) return;
+                const targetNum = parseInt(chosen, 10);
+                if (isNaN(targetNum) || targetNum < 1 || targetNum > allSteps.length) return;
+                const targetStep = allSteps[targetNum - 1];
+                if (targetStep.id === step.id) return;
+                const newJump: StepJump = { id: uuidv4(), label, targetStepId: targetStep.id };
+                onChange({ ...step, jumps: [...(step.jumps ?? []), newJump] });
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800 mt-1"
+            >
+              + ジャンプを追加
+            </button>
+          </div>
+        )}
 
         {/* Check items */}
         <div>
