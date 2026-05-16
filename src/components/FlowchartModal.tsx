@@ -28,14 +28,12 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
         mermaid.initialize({
           startOnLoad: false,
           theme: 'default',
-          layout: 'elk',
-          elk: { mergeEdges: true },
           flowchart: {
             useMaxWidth: true,
             htmlLabels: true,
             curve: 'linear',
           },
-        } as Parameters<typeof mermaid.initialize>[0]);
+        });
 
         const definition = buildFlowchartDefinition(instruction);
         const { svg } = await mermaid.render(`fc-${Date.now()}`, definition);
@@ -45,7 +43,7 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
           svgRef.current = svg;
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'フロー図の生成に失敗しました');
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e ?? 'フロー図の生成に失敗しました'));
       } finally {
         if (!cancelled) setLoading(false);
       }
