@@ -1,9 +1,10 @@
 'use client';
 
 import { Step, CheckItem, Condition, getStepImages } from '@/types/instruction';
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { compressImage } from '@/lib/compressImage';
+import ImageAnnotationEditor from './ImageAnnotationEditor';
 
 interface StepEditorProps {
   step: Step;
@@ -28,6 +29,7 @@ export default function StepEditor({
 }: StepEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
 
   const images = getStepImages(step);
 
@@ -321,6 +323,13 @@ export default function StepEditor({
                         )}
                         <button
                           type="button"
+                          onClick={() => setAnnotatingIdx(imgIdx)}
+                          className="text-xs text-purple-500 hover:text-purple-700"
+                        >
+                          注釈
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => removeImage(imgIdx)}
                           className="text-xs text-red-500 hover:text-red-700"
                         >
@@ -418,6 +427,18 @@ export default function StepEditor({
           </button>
         </div>
       </div>
+      {annotatingIdx !== null && (
+        <ImageAnnotationEditor
+          imageDataUrl={images[annotatingIdx]}
+          onSave={(url) => {
+            const updated = [...images];
+            updated[annotatingIdx] = url;
+            onChange({ ...step, imageDataUrl: undefined, imageDataUrls: updated });
+            setAnnotatingIdx(null);
+          }}
+          onClose={() => setAnnotatingIdx(null)}
+        />
+      )}
     </div>
   );
 }
