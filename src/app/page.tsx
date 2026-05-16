@@ -22,7 +22,7 @@ export default function HomePage() {
       .then(res => {
         const link = res.headers.get('Link') ?? '';
         const match = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
-        if (match) setVersion(`1.0.${match[1]}`);
+        if (match) setVersion(`1.${match[1]}`);
       })
       .catch(() => {});
   }, []);
@@ -181,6 +181,7 @@ export default function HomePage() {
 
       <footer className="mt-16 text-right text-xs text-gray-300 select-none">
         <p>作業手順書システム</p>
+        <p>Build 2026</p>
         {version && <p>Version {version}</p>}
         <p>Developed by Yuma Tani</p>
       </footer>
