@@ -30,6 +30,7 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
             useMaxWidth: true,
             htmlLabels: true,
             curve: 'linear',
+            padding: 20,
           },
         });
 
@@ -38,7 +39,16 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
 
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
-          svgRef.current = svg;
+          const svgEl = containerRef.current.querySelector('svg');
+          if (svgEl) {
+            const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+            style.textContent = `
+              .node .label { font-size: 14px; }
+              .flowchart-label { padding: 8px 16px !important; }
+            `;
+            svgEl.prepend(style);
+          }
+          svgRef.current = containerRef.current.innerHTML;
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e ?? 'フロー図の生成に失敗しました'));
