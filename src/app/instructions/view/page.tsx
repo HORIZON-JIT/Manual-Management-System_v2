@@ -3,12 +3,13 @@
 import { useEffect, useState, Suspense, Fragment } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { WorkInstruction, InstructionSnapshot, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
 import { getInstruction, importInstruction } from '@/lib/storage';
 import { parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
+import ViewHistoryModal from '@/components/ViewHistoryModal';
 
 function getYouTubeEmbedUrl(url: string): string | null {
   try {
@@ -36,6 +37,8 @@ function InstructionViewContent() {
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
   const [revealedCount, setRevealedCount] = useState(1);
+  const [showHistory, setShowHistory] = useState(false);
+  const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -147,7 +150,11 @@ function InstructionViewContent() {
     );
   }
 
-  const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
+  const sortedSteps = [...(viewingSnapshot?.steps ?? instruction.steps)].sort((a, b) => a.orderIndex - b.orderIndex);
+  const displayTitle = viewingSnapshot?.title ?? instruction.title;
+  const displayDescription = viewingSnapshot?.description ?? instruction.description;
+  const displayCategory = viewingSnapshot?.category ?? instruction.category;
+  const displayKeywords = viewingSnapshot?.keywords ?? instruction.keywords;
   const hasConditions = instruction.conditions && instruction.conditions.length > 0;
 
   const condGroupMap = new Map<string, string>();
@@ -251,6 +258,14 @@ function InstructionViewContent() {
           一覧に戻る
         </Link>
         <div className="flex-1" />
+        {instruction.updateHistory && instruction.updateHistory.some(e => !!e.snapshot) && (
+          <button
+            onClick={() => setShowHistory(true)}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+          >
+            改版履歴
+          </button>
+        )}
         {!isPreviewView && (
           <>
             <button
@@ -273,31 +288,44 @@ function InstructionViewContent() {
         )}
       </div>
 
+      {/* Snapshot viewing banner */}
+      {viewingSnapshot && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between no-print">
+          <p className="text-sm text-amber-800">過去バージョンを表示中</p>
+          <button
+            onClick={() => setViewingSnapshot(null)}
+            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700 transition"
+          >
+            現在のバージョンに戻る
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">{instruction.title}</h1>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">{displayTitle}</h1>
           <span
             className={`shrink-0 text-sm px-3 py-1 rounded-full font-medium ${
-              instruction.category === 'pc_work'
+              displayCategory === 'pc_work'
                 ? 'bg-blue-50 text-blue-600'
                 : 'bg-orange-50 text-orange-600'
             }`}
           >
-            {getCategoryLabel(instruction.category)}
+            {getCategoryLabel(displayCategory)}
           </span>
         </div>
-        {instruction.description && (
-          <p className="text-slate-600 mb-4">{instruction.description}</p>
+        {displayDescription && (
+          <p className="text-slate-600 mb-4">{displayDescription}</p>
         )}
         <div className="text-xs text-slate-400 flex flex-wrap gap-4">
           <span>作成日: {new Date(instruction.createdAt).toLocaleDateString('ja-JP')}{instruction.createdBy ? ` (${instruction.createdBy})` : ''}</span>
           <span>更新日: {new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}{instruction.updatedBy ? ` (${instruction.updatedBy})` : ''}</span>
-          <span>{instruction.steps.length} ステップ</span>
+          <span>{sortedSteps.length} ステップ</span>
         </div>
-        {instruction.keywords && instruction.keywords.length > 0 && (
+        {displayKeywords && displayKeywords.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {instruction.keywords.map((kw, i) => (
+            {displayKeywords.map((kw, i) => (
               <span
                 key={i}
                 className="inline-block text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200"
@@ -487,6 +515,13 @@ function InstructionViewContent() {
         })}
       </div>
 
+      {showHistory && instruction.updateHistory && (
+        <ViewHistoryModal
+          history={instruction.updateHistory}
+          onView={(snapshot) => { setViewingSnapshot(snapshot); setShowHistory(false); }}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }
