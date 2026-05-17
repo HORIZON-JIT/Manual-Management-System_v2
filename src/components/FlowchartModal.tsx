@@ -14,6 +14,8 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const svgRef = useRef<string>('');
+  const mermaidRef = useRef<string>('');
+  const [mermaidCopied, setMermaidCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +37,7 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
         });
 
         const definition = buildFlowchartDefinition(instruction);
+        mermaidRef.current = definition;
         const { svg } = await mermaid.render(`fc-${Date.now()}`, definition);
 
         if (!cancelled && containerRef.current) {
@@ -57,6 +60,21 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${instruction.title}_フロー図.svg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const copyMermaid = () => {
+    navigator.clipboard.writeText(mermaidRef.current);
+    setMermaidCopied(true);
+    setTimeout(() => setMermaidCopied(false), 2000);
+  };
+
+  const downloadMermaid = () => {
+    const blob = new Blob([mermaidRef.current], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${instruction.title}_フロー図.mmd`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -107,18 +125,30 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
         </div>
 
         {!loading && !error && (
-          <div className="flex items-center justify-end gap-2 px-6 py-3 border-t">
+          <div className="flex items-center justify-end gap-2 px-6 py-3 border-t flex-wrap">
             <button
-              onClick={downloadSvg}
+              onClick={copyMermaid}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
             >
-              SVG
+              {mermaidCopied ? 'コピー済' : 'Mermaidコピー'}
+            </button>
+            <button
+              onClick={downloadMermaid}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+            >
+              Mermaid保存
             </button>
             <button
               onClick={downloadPng}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
             >
-              PNG
+              画像保存
+            </button>
+            <button
+              onClick={downloadSvg}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+            >
+              SVG保存
             </button>
             <button
               onClick={onClose}
