@@ -4,14 +4,6 @@ function esc(text: string): string {
   return text.replace(/"/g, '#quot;').replace(/[[\]{}()]/g, '');
 }
 
-function wrapText(text: string, maxLen: number = 8): string {
-  if (text.length <= maxLen) return text;
-  const lines: string[] = [];
-  for (let i = 0; i < text.length; i += maxLen) {
-    lines.push(text.slice(i, i + maxLen));
-  }
-  return lines.join('<br/>');
-}
 
 export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   const steps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -50,7 +42,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
   const lbl = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
-  const dlbl = (s: Step) => `"${wrapText(esc(`${stepNum.get(s.id)}. ${s.title}`))}"`;
+  const dlbl = (s: Step) => `"<br/>${esc(`${stepNum.get(s.id)}. ${s.title}`)}<br/>"`;
 
 
   interface GroupSegment {
@@ -272,7 +264,7 @@ function buildLinear(steps: Step[]): string {
     const id = `s${i}`;
     const hasJumps = s.jumps && s.jumps.length > 0;
     if (hasJumps) {
-      lines.push(`  ${id}{"${wrapText(esc(`${i + 1}. ${s.title}`))}"}`);
+      lines.push(`  ${id}{"<br/>${esc(`${i + 1}. ${s.title}`)}<br/>"}`);
     } else {
       lines.push(`  ${id}["${esc(`${i + 1}. ${s.title}`)}"]`);
     }
