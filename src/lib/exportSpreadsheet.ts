@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+﻿import ExcelJS from 'exceljs';
 import { WorkInstruction, Condition, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
 
 /** Estimate row height for text in merged content columns */
@@ -23,15 +23,15 @@ const C = {
   badgeOrangeText: 'C2410C',// orange-700
   white: 'FFFFFF',
   dark: '111827',           // gray-900
-  text: '1F2937',           // gray-800 (was gray-700 — darkened for readability)
-  gray: '374151',           // gray-700 (was gray-500 — darkened for readability)
+  text: '1F2937',           // gray-800 (was gray-700 窶・darkened for readability)
+  gray: '374151',           // gray-700 (was gray-500 窶・darkened for readability)
   grayLight: 'F9FAFB',      // gray-50
   grayMid: 'F3F4F6',        // gray-100
-  border: 'D1D5DB',         // gray-300 (was gray-200 — slightly more visible)
+  border: 'D1D5DB',         // gray-300 (was gray-200 窶・slightly more visible)
   borderLight: 'F3F4F6',    // gray-100
   borderBlue: 'BFDBFE',     // blue-200
   cautionBg: 'FEF3C7',      // amber-100
-  cautionText: '78350F',    // amber-900 (was amber-800 — darker for readability)
+  cautionText: '78350F',    // amber-900 (was amber-800 窶・darker for readability)
   cautionBorder: 'F59E0B',  // amber-400
   stepTitle: '1E3A5F',      // dark blue
   accent: '2563EB',         // blue for accent strip
@@ -174,7 +174,7 @@ const solidFill = (color: string): ExcelJS.Fill => ({
 // Single instruction export
 // ============================================================
 
-export type ExcelNavMode = 'scroll' | 'jump';
+export type ExcelNavMode = 'none' | 'scroll' | 'jump';
 
 export interface CheckboxCell {
   sheetName: string;
@@ -184,7 +184,7 @@ export interface CheckboxCell {
 export interface ExcelBuildResult {
   buffer: ArrayBuffer;
   stepNavRows: number[];   // 0-based row index of nav footer in each step sheet (jump mode only)
-  indexNavRows: number[];  // 0-based row index of each "→ 開く" button on main sheet (jump mode only)
+  indexNavRows: number[];  // 0-based row index of each "開く" button on main sheet (jump mode only)
   checkboxCells: CheckboxCell[];  // positions of check item cells for Sheets API
 }
 
@@ -200,7 +200,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     properties: { showGridLines: false },
   });
 
-  // Columns: A(accent 1.5) B(label 6) C-N(content, 12 cols × 10 width)
+  // Columns: A(accent 1.5) B(label 6) C-N(content, 12 cols ﾃ・10 width)
   const contentColWidth = 10;
   ws.columns = [
     { width: 1.5 },  // A: accent stripe
@@ -264,7 +264,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
   const creatorStr = instruction.createdBy ? `作成者: ${instruction.createdBy}` : '';
   const updaterStr = instruction.updatedBy ? `更新者: ${instruction.updatedBy}` : '';
   const authorParts = [creatorStr, updaterStr].filter(Boolean).join('  |  ');
-  const metaRight = `${authorParts ? authorParts + '  |  ' : ''}作成: ${created}  |  更新: ${updated}  `;
+  const metaRight = `${authorParts ? `${authorParts}  |  ` : ''}作成日: ${created}  |  更新日: ${updated}  `;
   mergeStyled(ws, row, 6, row, LAST_COL, metaRight, {
     font: { size: 10, color: { argb: C.gray } },
     fill: solidFill(C.grayLight),
@@ -331,8 +331,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     // Condition divider row (scroll mode only) when transitioning between groups
     if (navMode === 'scroll' && instruction.conditions && instruction.conditions.length > 0 && currentCondKey !== lastCondKey) {
       const dividerLabel = currentCondKey === 'shared'
-        ? '▼ 共通（すべて）'
-        : `▼ ${instruction.conditions.find(c => c.id === currentCondKey)?.label ?? '条件'}のみ`;
+        ? '共通（すべて）'
+        : `${instruction.conditions.find(c => c.id === currentCondKey)?.label ?? '条件'}のみ`;
       const dividerBg = condColors ? condColors.dividerBg : C.headerBg;
       ws.getRow(row).height = 26;
       mergeStyled(ws, row, 1, row, LAST_COL, `  ${dividerLabel}`, {
@@ -416,7 +416,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
       // B: label
       const labelCell = sws.getCell(row, 2);
-      labelCell.value = '⚠ 注意';
+      labelCell.value = '注意';
       labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.cautionText } };
       labelCell.fill = solidFill(C.cautionBg);
       labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -445,7 +445,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     const stepImages = getStepImages(step);
     for (let imgIdx = 0; imgIdx < stepImages.length; imgIdx++) {
       const IMAGE_ROW_HEIGHT = 18; // points
-      const PX_PER_PT = 1.33; // 1 Excel point ≈ 1.33 pixels
+      const PX_PER_PT = 1.33; // 1 Excel point 竕・1.33 pixels
       const IMAGE_ROW_HEIGHT_PX = IMAGE_ROW_HEIGHT * PX_PER_PT;
       const MAX_IMG_WIDTH = 700;
       const MAX_IMG_HEIGHT = 500;
@@ -483,7 +483,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
 
       // B label text on first row
       const labelCell = sws.getCell(imageStartRow, 2);
-      labelCell.value = stepImages.length > 1 ? `画像 ${imgIdx + 1}` : '画像';
+      labelCell.value = stepImages.length > 1 ? `画像${imgIdx + 1}` : '画像';
       labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.gray } };
       labelCell.alignment = { horizontal: 'center', vertical: 'top' };
 
@@ -501,11 +501,11 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       // Place image with tl + ext (pixel size) to guarantee correct aspect ratio
       const { base64, extension } = parseDataUrl(stepImages[imgIdx]);
       const imageId = wb.addImage({ base64, extension });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sws.addImage(imageId, {
+      const imagePosition: ExcelJS.ImagePosition = {
         tl: { col: CONTENT_START_COL - 1 + 0.2, row: imageStartRow - 1 + 0.3 },
         ext: { width: imgW, height: imgH },
-      } as any);
+      };
+      sws.addImage(imageId, imagePosition);
 
       row = imageStartRow + imageRows;
 
@@ -531,35 +531,6 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       }
     }
 
-    // --- Video URL ---
-    if (step.videoUrl) {
-      sws.getRow(row).height = 30;
-
-      // A: accent (condition-colored)
-      const aCell = sws.getCell(row, 1);
-      aCell.fill = solidFill(accentColor);
-      setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
-
-      // B: label
-      const labelCell = sws.getCell(row, 2);
-      labelCell.value = '▶ 動画';
-      labelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: C.primaryMid } };
-      labelCell.fill = solidFill(C.white);
-      labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      setBoxBorder(labelCell, { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER });
-
-      // C-N: url
-      mergeStyled(sws, row, CONTENT_START_COL, row, LAST_COL, step.videoUrl, {
-        font: { size: 11, color: { argb: C.primaryMid }, underline: true },
-        fill: solidFill(C.white),
-        border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
-      });
-      sws.getCell(row, CONTENT_START_COL).value = {
-        text: step.videoUrl,
-        hyperlink: step.videoUrl,
-      } as ExcelJS.CellHyperlinkValue;
-      row++;
-    }
 
     // --- Check items ---
     if (step.checkItems && step.checkItems.length > 0) {
@@ -571,7 +542,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         setBoxBorder(aCell, { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER });
 
         const labelCell = sws.getCell(row, 2);
-        labelCell.value = '☐';
+        labelCell.value = '□';
         labelCell.font = { name: 'Arial', size: 12, color: { argb: C.dark } };
         labelCell.fill = solidFill(C.grayLight);
         labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -597,7 +568,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
       aNav.fill = solidFill(accentColor);
 
       // B-N: nav button (merged, blue bar)
-      mergeStyled(sws, row, 2, row, LAST_COL, isLastStep ? '↑ 概要へ戻る' : '次へ →', {
+      mergeStyled(sws, row, 2, row, LAST_COL, isLastStep ? '概要へ戻る' : '次へ', {
         font: { bold: true, size: 13, color: { argb: C.white } },
         fill: solidFill(C.primaryMid),
         alignment: { horizontal: 'center', vertical: 'middle' },
@@ -645,8 +616,8 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
         border: { top: THIN_BORDER, bottom: THIN_BORDER, left: NO_BORDER, right: NO_BORDER },
       });
 
-      // M-N: "→ 開く" button placeholder (link added by Sheets API)
-      mergeStyled(ws, row, INDEX_BTN_COL, row, LAST_COL, '→ 開く', {
+      // M-N: "開く" button placeholder (link added by Sheets API)
+      mergeStyled(ws, row, INDEX_BTN_COL, row, LAST_COL, '開く', {
         font: { bold: true, size: 11, color: { argb: C.white } },
         fill: solidFill(C.primaryLight),
         alignment: { horizontal: 'center', vertical: 'middle' },
@@ -658,7 +629,7 @@ export async function buildExcelBuffer(instruction: WorkInstruction, navMode: Ex
     }
   }
   ws.getRow(row).height = 22;
-  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ  `, {
+  mergeStyled(ws, row, 1, row, LAST_COL, `全 ${sortedSteps.length} ステップ`, {
     font: { size: 9, italic: true, color: { argb: C.gray } },
     fill: solidFill(C.grayMid),
     alignment: { horizontal: 'right' },
@@ -880,7 +851,7 @@ export async function buildAllExcelBuffer(instructions: WorkInstruction[]): Prom
 
   // Footer
   row++;
-  mergeStyled(ws, row, 1, row, COLS, `合計：${instructions.length} 件`, {
+  mergeStyled(ws, row, 1, row, COLS, `合計: ${instructions.length} 件`, {
     font: { size: 9, italic: true, color: { argb: C.gray } },
     alignment: { horizontal: 'right' },
     border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },

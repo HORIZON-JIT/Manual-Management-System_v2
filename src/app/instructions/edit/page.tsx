@@ -16,7 +16,6 @@ function EditInstructionContent() {
   useEffect(() => {
     const source = searchParams.get('source');
     if (source === 'drive') {
-      // Driveから読み込んだデータをIndexedDBから取得
       getTempData('drive_import_instruction').then((raw) => {
         if (raw) {
           removeTempData('drive_import_instruction');
@@ -28,30 +27,30 @@ function EditInstructionContent() {
         }
         setLoading(false);
       }).catch(() => setLoading(false));
-    } else {
-      const id = searchParams.get('id');
-      if (id) {
-        const data = getInstruction(id);
-        setInstruction(data || null);
-      }
-      setLoading(false);
+      return;
     }
+
+    Promise.resolve().then(() => {
+      const id = searchParams.get('id');
+      setInstruction(id ? getInstruction(id) || null : null);
+      setLoading(false);
+    });
   }, [searchParams]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-gray-500">読み込み中...</p>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <p className="text-slate-500">読み込み中...</p>
       </div>
     );
   }
 
   if (!instruction) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-        <p className="text-gray-500 text-lg">手順書が見つかりません</p>
-        <Link href="/" className="text-blue-600 hover:text-blue-800">
-          一覧に戻る
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-lg font-semibold text-slate-700">手順書が見つかりません</p>
+        <Link href="/" className="text-sm font-medium text-blue-700 hover:text-blue-900">
+          ホームへ戻る
         </Link>
       </div>
     );
@@ -62,7 +61,7 @@ function EditInstructionContent() {
 
 export default function EditInstructionPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><p className="text-gray-500">読み込み中...</p></div>}>
+    <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center"><p className="text-slate-500">読み込み中...</p></div>}>
       <EditInstructionContent />
     </Suspense>
   );

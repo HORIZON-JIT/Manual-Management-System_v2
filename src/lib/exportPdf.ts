@@ -1,4 +1,4 @@
-import type jsPDF from 'jspdf';
+﻿import type jsPDF from 'jspdf';
 import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
 
 export async function exportToPdf(instruction: WorkInstruction): Promise<void> {
@@ -60,7 +60,7 @@ function buildHtmlElement(instruction: WorkInstruction): HTMLDivElement {
     marginTop: '6px',
     letterSpacing: '0.5px',
   }, titleBanner);
-  titleSub.textContent = '作業手順書';
+  titleSub.textContent = '菴懈･ｭ謇矩・嶌';
 
   // Meta bar
   const metaBar = createEl('div', {
@@ -93,7 +93,7 @@ function buildHtmlElement(instruction: WorkInstruction): HTMLDivElement {
     color: '#9CA3AF',
     fontSize: '10px',
   }, metaBar);
-  dateInfo.textContent = `作成: ${new Date(instruction.createdAt).toLocaleDateString('ja-JP')}  |  更新: ${new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`;
+  dateInfo.textContent = `菴懈・: ${new Date(instruction.createdAt).toLocaleDateString('ja-JP')}  |  譖ｴ譁ｰ: ${new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`;
 
   // Description
   if (instruction.description) {
@@ -243,22 +243,6 @@ function buildHtmlElement(instruction: WorkInstruction): HTMLDivElement {
       cautionText.textContent = step.caution;
     }
 
-    // Video URL
-    if (step.videoUrl) {
-      const videoRow = createEl('div', {
-        fontSize: '12px',
-        color: '#2563EB',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-      }, stepBody);
-      const videoIcon = createEl('span', {
-        fontSize: '13px',
-      }, videoRow);
-      videoIcon.textContent = '\u25B6';
-      const videoLabel = createEl('span', {}, videoRow);
-      videoLabel.textContent = `\u52D5\u753B: ${step.videoUrl}`;
-    }
   }
 
   // Footer

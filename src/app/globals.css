@@ -1,9 +1,49 @@
 @import "tailwindcss";
 
+:root {
+  --background: #f7f6f3;
+  --foreground: #111111;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+}
+
 body {
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0, rgba(247, 246, 243, 0.96) 26rem),
+    var(--background);
   font-family: 'Inter', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select {
+  border-radius: 8px;
+}
+
+::selection {
+  background: rgba(164, 129, 73, 0.18);
 }
 
 @media print {

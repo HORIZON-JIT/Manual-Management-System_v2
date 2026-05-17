@@ -1,35 +1,19 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, Suspense, Fragment } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, InstructionSnapshot, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
-import { getInstruction, importInstruction } from '@/lib/storage';
-import { parseShareData } from '@/lib/shareLink';
+import { getInstruction } from '@/lib/storage';
+import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
 
-function getYouTubeEmbedUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    let videoId: string | null = null;
-    if (parsed.hostname.includes('youtube.com')) {
-      videoId = parsed.searchParams.get('v');
-    } else if (parsed.hostname === 'youtu.be') {
-      videoId = parsed.pathname.slice(1);
-    }
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-  } catch {
-    return null;
-  }
-}
-
 function InstructionViewContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [instruction, setInstruction] = useState<WorkInstruction | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSharedView, setIsSharedView] = useState(false);
@@ -41,6 +25,7 @@ function InstructionViewContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
+  const [viewUrlCopied, setViewUrlCopied] = useState(false);
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -107,11 +92,16 @@ function InstructionViewContent() {
     window.print();
   };
 
-  const handleImport = () => {
-    if (!instruction) return;
-    const newId = importInstruction(instruction);
-    window.location.hash = '';
-    router.push(`/instructions/view?id=${newId}`);
+  const appViewUrl = (() => {
+    const driveFileId = searchParams.get('driveFileId') || instruction?.driveFileId;
+    return driveFileId ? `${getViewPageBaseUrl()}?driveFileId=${driveFileId}` : null;
+  })();
+
+  const handleCopyViewUrl = async () => {
+    if (!appViewUrl) return;
+    await navigator.clipboard.writeText(appViewUrl);
+    setViewUrlCopied(true);
+    setTimeout(() => setViewUrlCopied(false), 2000);
   };
 
   if (loading) {
@@ -137,7 +127,7 @@ function InstructionViewContent() {
             </button>
           )}
           <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
-            一覧に戻る
+            ホームへ戻る
           </Link>
         </div>
       );
@@ -146,7 +136,7 @@ function InstructionViewContent() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
         <p className="text-slate-500 text-lg">手順書が見つかりません</p>
         <Link href="/" className="text-blue-600 hover:text-blue-800">
-          一覧に戻る
+          ホームへ戻る
         </Link>
       </div>
     );
@@ -228,51 +218,23 @@ function InstructionViewContent() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Preview banner */}
-      {isPreviewView && (
-        <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between no-print">
-          <p className="text-sm text-violet-800">
-            DriveのJSONファイルをプレビュー表示しています
-          </p>
-          <button
-            onClick={handleImport}
-            className="px-3 py-1.5 bg-violet-600 text-white rounded text-sm hover:bg-violet-700 transition"
-          >
-            インポートして保存
-          </button>
-        </div>
-      )}
-
-      {/* Shared view banner */}
-      {isSharedView && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between no-print">
-          <p className="text-sm text-purple-800">
-            共有された手順書を閲覧しています
-          </p>
-          <button
-            onClick={handleImport}
-            className="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition"
-          >
-            インポートして保存
-          </button>
-        </div>
-      )}
-
       {/* Action bar */}
       <div className="flex flex-wrap items-center gap-2 mb-6 no-print">
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 transition">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          一覧に戻る
-        </Link>
         <div className="flex-1" />
+        {appViewUrl && (
+          <button
+            onClick={handleCopyViewUrl}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+          >
+            {viewUrlCopied ? 'URLをコピー済み' : 'アプリ閲覧URL'}
+          </button>
+        )}
         {instruction.updateHistory && instruction.updateHistory.some(e => !!e.snapshot) && (
           <button
             onClick={() => setShowHistory(true)}
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
           >
-            改版履歴
+            更新履歴
           </button>
         )}
         <button
@@ -306,7 +268,7 @@ function InstructionViewContent() {
       {/* Snapshot viewing banner */}
       {viewingSnapshot && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between no-print">
-          <p className="text-sm text-amber-800">過去バージョンを表示中</p>
+          <p className="text-sm text-amber-800">過去バージョンを表示中です</p>
           <button
             onClick={() => setViewingSnapshot(null)}
             className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700 transition"
@@ -367,7 +329,7 @@ function InstructionViewContent() {
           <Fragment key={step.id}>
             {showInlineTabs && group && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
-                <p className="text-xs text-slate-500 mb-2 font-medium">▼ 条件で表示を切り替え</p>
+                <p className="text-xs text-slate-500 mb-2 font-medium">条件で表示を切り替え</p>
                 <div className="flex gap-2 flex-wrap">
                   {zoneConds.map((cond, condIdx) => {
                     const isActive = zoneSel === cond.id || (zoneSel === null && condIdx === 0);
@@ -412,7 +374,7 @@ function InstructionViewContent() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imgUrl}
-                    alt={`ステップ ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
+                    alt={`ステップ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
                     className="max-w-full h-auto mx-auto"
                   />
                   {getImageCaption(step, imgIdx) && (
@@ -423,34 +385,6 @@ function InstructionViewContent() {
                 </div>
               ))}
 
-              {step.videoUrl && (
-                <div>
-                  {getYouTubeEmbedUrl(step.videoUrl) ? (
-                    <div className="relative w-full rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-                      <iframe
-                        src={getYouTubeEmbedUrl(step.videoUrl)!}
-                        title={`ステップ ${stepNumbers[index]} の動画`}
-                        className="absolute inset-0 w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <a
-                      href={step.videoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm transition"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      動画を再生
-                    </a>
-                  )}
-                </div>
-              )}
 
               {step.links && step.links.length > 0 && (
                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 space-y-1.5">
@@ -499,12 +433,12 @@ function InstructionViewContent() {
 
               {step.caution && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                  <p className="text-sm text-amber-800 font-medium flex items-center gap-1.5">
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-start gap-1.5 text-sm text-amber-800 font-medium">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
-                    注意: {step.caution}
-                  </p>
+                    <p className="whitespace-pre-wrap leading-6">注意: {step.caution}</p>
+                  </div>
                 </div>
               )}
 
@@ -549,11 +483,11 @@ function InstructionViewContent() {
                     onClick={() => setRevealedCount(c => c + 1)}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
                   >
-                    次へ →
+                    次へ
                   </button>
                 ) : (
                   <span className="px-6 py-2.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl">
-                    完了 ✓
+                    完了
                   </span>
                 )}
               </div>

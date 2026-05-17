@@ -33,7 +33,6 @@ export interface Step {
   imageDataUrl?: string;
   imageDataUrls?: string[];
   imageCaptions?: string[];
-  videoUrl?: string;
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
@@ -106,6 +105,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   packing: '梱包作業',
   事務作業: '事務作業',
   現場作業: '現場作業',
+  '莠句漁菴懈･ｭ': '事務作業',
+  '迴ｾ蝣ｴ菴懈･ｭ': '現場作業',
 };
 
 /** Get display label for a category (falls back to the raw value for custom categories) */

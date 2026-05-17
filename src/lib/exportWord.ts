@@ -1,4 +1,4 @@
-import {
+﻿import {
   Document,
   Packer,
   Paragraph,
@@ -137,13 +137,13 @@ export async function exportToWord(instruction: WorkInstruction): Promise<void> 
       shading: { type: ShadingType.SOLID, color: COLORS.grayLight },
       children: [
         new TextRun({
-          text: `カテゴリ：${getCategoryLabel(instruction.category)}`,
+          text: `繧ｫ繝・ざ繝ｪ・・{getCategoryLabel(instruction.category)}`,
           size: 20,
           color: COLORS.dark,
           font: 'Arial',
         }),
         new TextRun({
-          text: `　　作成：${new Date(instruction.createdAt).toLocaleDateString('ja-JP')}　更新：${new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`,
+          text: `縲縲菴懈・・・{new Date(instruction.createdAt).toLocaleDateString('ja-JP')}縲譖ｴ譁ｰ・・{new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`,
           size: 18,
           color: COLORS.gray,
           font: 'Arial',
@@ -256,7 +256,7 @@ export async function exportToWord(instruction: WorkInstruction): Promise<void> 
           },
           children: [
             new TextRun({
-              text: `  ⚠ 注意：${step.caution}`,
+              text: `  注意: ${step.caution}`,
               bold: true,
               size: 20,
               color: COLORS.cautionText,
@@ -267,34 +267,6 @@ export async function exportToWord(instruction: WorkInstruction): Promise<void> 
       );
     }
 
-    // Video URL
-    if (step.videoUrl) {
-      children.push(
-        new Paragraph({
-          spacing: { before: 60, after: 60 },
-          children: [
-            new TextRun({
-              text: '動画：',
-              size: 18,
-              color: COLORS.gray,
-              font: 'Arial',
-            }),
-            new ExternalHyperlink({
-              link: step.videoUrl,
-              children: [
-                new TextRun({
-                  text: step.videoUrl,
-                  size: 18,
-                  color: COLORS.primary,
-                  underline: {},
-                  font: 'Arial',
-                }),
-              ],
-            }),
-          ],
-        }),
-      );
-    }
   }
 
   // Footer

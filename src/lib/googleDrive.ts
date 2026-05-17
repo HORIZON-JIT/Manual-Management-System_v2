@@ -13,6 +13,10 @@ interface DriveFile {
   id: string;
   name: string;
   mimeType: string;
+  modifiedTime?: string;
+  size?: string;
+  owners?: Array<{ displayName?: string }>;
+  lastModifyingUser?: { displayName?: string };
 }
 
 interface DriveFileList {
@@ -176,6 +180,10 @@ async function findFile(folderId: string): Promise<string | null> {
 export interface DriveFileInfo {
   id: string;
   name: string;
+  modifiedTime?: string;
+  size?: number;
+  ownerName?: string;
+  lastModifyingUserName?: string;
 }
 
 export async function listJsonFilesInFolder(folderId: string): Promise<DriveFileInfo[]> {
@@ -183,14 +191,21 @@ export async function listJsonFilesInFolder(folderId: string): Promise<DriveFile
     path: 'https://www.googleapis.com/drive/v3/files',
     params: {
       q: `'${folderId}' in parents and mimeType='application/json' and trashed=false`,
-      fields: 'files(id,name)',
+      fields: 'files(id,name,modifiedTime,size,owners(displayName),lastModifyingUser(displayName))',
       orderBy: 'modifiedTime desc',
       pageSize: '100',
       supportsAllDrives: 'true',
       includeItemsFromAllDrives: 'true',
     },
   });
-  return res.result.files.map((f) => ({ id: f.id, name: f.name }));
+  return res.result.files.map((f) => ({
+    id: f.id,
+    name: f.name,
+    modifiedTime: f.modifiedTime,
+    size: f.size ? Number(f.size) : undefined,
+    ownerName: f.owners?.[0]?.displayName,
+    lastModifyingUserName: f.lastModifyingUser?.displayName,
+  }));
 }
 
 export async function downloadDriveFile(fileId: string): Promise<string> {

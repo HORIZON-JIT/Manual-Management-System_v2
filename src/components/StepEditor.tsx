@@ -1,8 +1,15 @@
 'use client';
 
-import { Step, CheckItem, StepLink, StepJump, Condition, getStepImages } from '@/types/instruction';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  Step,
+  CheckItem,
+  StepLink,
+  StepJump,
+  Condition,
+  getStepImages,
+} from '@/types/instruction';
 import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
 import ImageAnnotationEditor from './ImageAnnotationEditor';
@@ -18,6 +25,10 @@ interface StepEditorProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
 }
+
+const inputClass =
+  'w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100';
+const labelClass = 'mb-1.5 block text-sm font-semibold text-slate-700';
 
 export default function StepEditor({
   step,
@@ -38,77 +49,102 @@ export default function StepEditor({
   const [jumpTargetId, setJumpTargetId] = useState('');
 
   const images = getStepImages(step);
-
-  // Use refs to avoid stale closures when multiple FileReaders resolve
   const stepRef = useRef(step);
   const imagesRef = useRef(images);
-  stepRef.current = step;
-  imagesRef.current = images;
 
-  const addImage = useCallback((dataUrl: string) => {
-    const s = stepRef.current;
-    const imgs = imagesRef.current;
-    const captions = s.imageCaptions ?? [];
-    onChange({
-      ...s,
-      imageDataUrl: undefined,
-      imageDataUrls: [...imgs, dataUrl],
-      imageCaptions: [...captions, ''],
-    });
-  }, [onChange]);
+  useEffect(() => {
+    stepRef.current = step;
+    imagesRef.current = images;
+  }, [step, images]);
 
-  const removeImage = useCallback((idx: number) => {
-    const s = stepRef.current;
-    const updatedImgs = imagesRef.current.filter((_, i) => i !== idx);
-    const updatedCaptions = (s.imageCaptions ?? []).filter((_, i) => i !== idx);
-    onChange({
-      ...s,
-      imageDataUrl: undefined,
-      imageDataUrls: updatedImgs.length > 0 ? updatedImgs : undefined,
-      imageCaptions: updatedCaptions.length > 0 ? updatedCaptions : undefined,
-    });
-  }, [onChange]);
+  const addImage = useCallback(
+    (dataUrl: string) => {
+      const currentStep = stepRef.current;
+      const currentImages = imagesRef.current;
+      const captions = currentStep.imageCaptions ?? [];
+      onChange({
+        ...currentStep,
+        imageDataUrl: undefined,
+        imageDataUrls: [...currentImages, dataUrl],
+        imageCaptions: [...captions, ''],
+      });
+    },
+    [onChange],
+  );
 
-  const moveImage = useCallback((idx: number, direction: 'up' | 'down') => {
-    const s = stepRef.current;
-    const imgs = [...imagesRef.current];
-    const captions = [...(s.imageCaptions ?? [])];
-    while (captions.length < imgs.length) captions.push('');
-    const target = direction === 'up' ? idx - 1 : idx + 1;
-    if (target < 0 || target >= imgs.length) return;
-    [imgs[idx], imgs[target]] = [imgs[target], imgs[idx]];
-    [captions[idx], captions[target]] = [captions[target], captions[idx]];
-    onChange({
-      ...s,
-      imageDataUrl: undefined,
-      imageDataUrls: imgs,
-      imageCaptions: captions.some(c => c) ? captions : undefined,
-    });
-  }, [onChange]);
+  const removeImage = useCallback(
+    (imageIndex: number) => {
+      const currentStep = stepRef.current;
+      const updatedImages = imagesRef.current.filter((_, i) => i !== imageIndex);
+      const updatedCaptions = (currentStep.imageCaptions ?? []).filter(
+        (_, i) => i !== imageIndex,
+      );
+      onChange({
+        ...currentStep,
+        imageDataUrl: undefined,
+        imageDataUrls: updatedImages.length > 0 ? updatedImages : undefined,
+        imageCaptions: updatedCaptions.length > 0 ? updatedCaptions : undefined,
+      });
+    },
+    [onChange],
+  );
 
-  const updateCaption = useCallback((idx: number, caption: string) => {
-    const captions = [...(step.imageCaptions ?? [])];
-    // Ensure array is long enough
-    while (captions.length <= idx) captions.push('');
-    captions[idx] = caption;
-    onChange({ ...step, imageCaptions: captions });
-  }, [onChange, step]);
+  const moveImage = useCallback(
+    (imageIndex: number, direction: 'up' | 'down') => {
+      const currentStep = stepRef.current;
+      const updatedImages = [...imagesRef.current];
+      const captions = [...(currentStep.imageCaptions ?? [])];
+      while (captions.length < updatedImages.length) captions.push('');
 
-  const processImageFile = useCallback((file: File) => {
-    if (file.size > 20 * 1024 * 1024) {
-      alert('画像サイズは20MB以下にしてください。');
-      return;
-    }
-    compressImage(file)
-      .then((dataUrl) => addImage(dataUrl))
-      .catch(() => alert('画像の処理に失敗しました。'));
-  }, [addImage]);
+      const targetIndex = direction === 'up' ? imageIndex - 1 : imageIndex + 1;
+      if (targetIndex < 0 || targetIndex >= updatedImages.length) return;
+
+      [updatedImages[imageIndex], updatedImages[targetIndex]] = [
+        updatedImages[targetIndex],
+        updatedImages[imageIndex],
+      ];
+      [captions[imageIndex], captions[targetIndex]] = [
+        captions[targetIndex],
+        captions[imageIndex],
+      ];
+
+      onChange({
+        ...currentStep,
+        imageDataUrl: undefined,
+        imageDataUrls: updatedImages,
+        imageCaptions: captions.some((caption) => caption) ? captions : undefined,
+      });
+    },
+    [onChange],
+  );
+
+  const updateCaption = useCallback(
+    (imageIndex: number, caption: string) => {
+      const captions = [...(step.imageCaptions ?? [])];
+      while (captions.length <= imageIndex) captions.push('');
+      captions[imageIndex] = caption;
+      onChange({ ...step, imageCaptions: captions });
+    },
+    [onChange, step],
+  );
+
+  const processImageFile = useCallback(
+    (file: File) => {
+      if (file.size > 20 * 1024 * 1024) {
+        alert('画像サイズは20MB以下にしてください。');
+        return;
+      }
+
+      compressImage(file)
+        .then((dataUrl) => addImage(dataUrl))
+        .catch(() => alert('画像の処理に失敗しました。'));
+    },
+    [addImage],
+  );
 
   const handleScreenCapture = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-      });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const video = document.createElement('video');
       video.srcObject = stream;
       video.autoplay = true;
@@ -120,15 +156,14 @@ export default function StepEditor({
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(video, 0, 0);
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach((track) => track.stop());
       video.srcObject = null;
       const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob((b) => resolve(b!), 'image/png')
+        canvas.toBlob((b) => resolve(b!), 'image/png'),
       );
-      const file = new File([blob], 'screenshot.png', { type: 'image/png' });
-      processImageFile(file);
+      processImageFile(new File([blob], 'screenshot.png', { type: 'image/png' }));
     } catch {
-      // ユーザーがキャンセルした場合は何もしない
+      // User cancelled screen capture.
     }
   }, [processImageFile]);
 
@@ -139,141 +174,206 @@ export default function StepEditor({
     e.target.value = '';
   };
 
-  // Paste handler that captures image paste from anywhere in the step editor
-  const handlePaste = useCallback((e: ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) processImageFile(file);
-        return;
+  const handlePaste = useCallback(
+    (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) processImageFile(file);
+          return;
+        }
       }
-    }
-  }, [processImageFile]);
+    },
+    [processImageFile],
+  );
 
-  // Attach paste listener to the entire step editor container
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('paste', handlePaste);
-    return () => el.removeEventListener('paste', handlePaste);
+    const element = containerRef.current;
+    if (!element) return;
+    element.addEventListener('paste', handlePaste);
+    return () => element.removeEventListener('paste', handlePaste);
   }, [handlePaste]);
 
+  const groupedConditions = (() => {
+    const groupOrder: string[] = [];
+    const grouped = new Map<string, Condition[]>();
+    for (const condition of conditions ?? []) {
+      const group = condition.group || '__default';
+      if (!grouped.has(group)) {
+        grouped.set(group, []);
+        groupOrder.push(group);
+      }
+      grouped.get(group)!.push(condition);
+    }
+    return { groupOrder, grouped };
+  })();
+
   return (
-    <div ref={containerRef} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-blue-600">ステップ {index + 1}</h3>
+    <section
+      ref={containerRef}
+      className="rounded-lg border border-slate-200 bg-white shadow-sm"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-sm font-bold text-white">
+            {index + 1}
+          </span>
+          <div>
+            <h3 className="font-semibold text-slate-950">ステップ {index + 1}</h3>
+            <p className="text-xs text-slate-500">
+              {totalSteps}件中 {index + 1}件目
+            </p>
+          </div>
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30"
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-30"
             title="上へ移動"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 15l7-7 7 7"
+              />
             </svg>
           </button>
           <button
             type="button"
             onClick={onMoveDown}
             disabled={index === totalSteps - 1}
-            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30"
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-30"
             title="下へ移動"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </button>
           <button
             type="button"
             onClick={onRemove}
-            className="p-1 text-red-400 hover:text-red-600 ml-2"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
             title="削除"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {conditions && conditions.length > 0 && (() => {
-          const groupOrder: string[] = [];
-          const grouped = new Map<string, Condition[]>();
-          for (const c of conditions) {
-            const g = c.group || '__default';
-            if (!grouped.has(g)) { grouped.set(g, []); groupOrder.push(g); }
-            grouped.get(g)!.push(c);
-          }
-          const hasMultipleGroups = groupOrder.length > 1;
-          return (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">表示条件</label>
-              <select
-                value={step.conditionId ?? ''}
-                onChange={(e) => onChange({ ...step, conditionId: e.target.value || undefined })}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-              >
-                <option value="">共通（すべての条件で表示）</option>
-                {hasMultipleGroups
-                  ? groupOrder.map((gid, gi) => (
-                      <optgroup key={gid} label={`グループ ${String.fromCharCode(65 + gi)}`}>
-                        {grouped.get(gid)!.map(c => (
-                          <option key={c.id} value={c.id}>{c.label || '(未入力)'}</option>
-                        ))}
-                      </optgroup>
-                    ))
-                  : conditions.map((c, ci) => (
-                      <option key={c.id} value={c.id}>{c.label || `条件 ${ci + 1}`}</option>
-                    ))
-                }
-              </select>
-            </div>
-          );
-        })()}
+      <div className="space-y-5 p-5">
+        {conditions && conditions.length > 0 && (
+          <div>
+            <label className={labelClass}>表示条件</label>
+            <select
+              value={step.conditionId ?? ''}
+              onChange={(e) =>
+                onChange({ ...step, conditionId: e.target.value || undefined })
+              }
+              className={inputClass}
+            >
+              <option value="">共通（すべての条件で表示）</option>
+              {groupedConditions.groupOrder.length > 1
+                ? groupedConditions.groupOrder.map((groupId, groupIndex) => (
+                    <optgroup
+                      key={groupId}
+                      label={`グループ ${String.fromCharCode(65 + groupIndex)}`}
+                    >
+                      {groupedConditions.grouped.get(groupId)!.map((condition) => (
+                        <option key={condition.id} value={condition.id}>
+                          {condition.label || '(未入力)'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                : conditions.map((condition, conditionIndex) => (
+                    <option key={condition.id} value={condition.id}>
+                      {condition.label || `条件 ${conditionIndex + 1}`}
+                    </option>
+                  ))}
+            </select>
+          </div>
+        )}
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
+          <label className={labelClass}>タイトル</label>
           <input
             type="text"
             value={step.title}
             onChange={(e) => onChange({ ...step, title: e.target.value })}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className={inputClass}
             placeholder="例: システムにログインする"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
+          <label className={labelClass}>説明</label>
           <textarea
             value={step.description}
             onChange={(e) => onChange({ ...step, description: e.target.value })}
-            rows={3}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y"
-            placeholder="手順の詳細を記入してください"
+            rows={4}
+            className={`${inputClass} resize-y`}
+            placeholder="手順の詳細を入力してください"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">注意事項（任意）</label>
-          <input
-            type="text"
+          <label className={labelClass}>注意事項（任意）</label>
+          <textarea
             value={step.caution || ''}
             onChange={(e) => onChange({ ...step, caution: e.target.value })}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
-            placeholder="注意すべきポイントがあれば記入"
+            rows={4}
+            className={`${inputClass} resize-y`}
+            placeholder="注意すべきポイントがあれば入力"
           />
         </div>
 
-        {/* Image section */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            スクリーンショット・画像（任意・複数可）
-          </label>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                画像・スクリーンショット
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                複数画像、注釈、貼り付けに対応しています。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-50"
+              >
+                画像を追加
+              </button>
+              <button
+                type="button"
+                onClick={handleScreenCapture}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+              >
+                スクショ撮影
+              </button>
+            </div>
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -283,61 +383,63 @@ export default function StepEditor({
             className="hidden"
           />
 
-          {/* Existing images */}
-          {images.length > 0 && (
-            <div className="space-y-3 mb-2">
+          {images.length > 0 ? (
+            <div className="space-y-3">
               {images.map((imgUrl, imgIdx) => (
-                <div key={imgIdx} className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                <div
+                  key={imgIdx}
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imgUrl}
                     alt={`ステップ ${index + 1} の画像 ${imgIdx + 1}`}
-                    className="max-w-full max-h-48 object-contain mx-auto"
+                    className="mx-auto max-h-56 max-w-full object-contain"
                   />
-                  <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 space-y-1.5">
+                  <div className="space-y-2 border-t border-slate-200 bg-white p-3">
                     <input
                       type="text"
                       value={(step.imageCaptions ?? [])[imgIdx] ?? ''}
                       onChange={(e) => updateCaption(imgIdx, e.target.value)}
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="画像のコメントを入力..."
+                      className={`${inputClass} py-1.5 text-xs`}
+                      placeholder="画像のコメントを入力"
                     />
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">画像 {imgIdx + 1}/{images.length}</span>
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-slate-500">
+                        画像 {imgIdx + 1} / {images.length}
+                      </span>
+                      <div className="flex items-center gap-3">
                         {images.length > 1 && (
                           <>
                             <button
                               type="button"
                               onClick={() => moveImage(imgIdx, 'up')}
                               disabled={imgIdx === 0}
-                              className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30"
-                              title="前へ"
+                              className="text-slate-500 hover:text-blue-700 disabled:opacity-30"
                             >
-                              ▲
+                              前へ
                             </button>
                             <button
                               type="button"
                               onClick={() => moveImage(imgIdx, 'down')}
                               disabled={imgIdx === images.length - 1}
-                              className="text-xs text-gray-500 hover:text-blue-600 disabled:opacity-30"
-                              title="後へ"
+                              className="text-slate-500 hover:text-blue-700 disabled:opacity-30"
                             >
-                              ▼
+                              次へ
                             </button>
                           </>
                         )}
                         <button
                           type="button"
                           onClick={() => setAnnotatingIdx(imgIdx)}
-                          className="text-xs text-purple-500 hover:text-purple-700"
+                          className="font-medium text-violet-700 hover:text-violet-900"
                         >
                           注釈
                         </button>
                         <button
                           type="button"
                           onClick={() => removeImage(imgIdx)}
-                          className="text-xs text-red-500 hover:text-red-700"
+                          className="font-medium text-red-600 hover:text-red-800"
                         >
                           削除
                         </button>
@@ -347,238 +449,271 @@ export default function StepEditor({
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm text-slate-500">
+              画像はまだありません。Ctrl+V で貼り付けることもできます。
+            </p>
           )}
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-600 hover:bg-blue-100 transition"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              画像を追加
-            </button>
-            <button
-              type="button"
-              onClick={handleScreenCapture}
-              className="flex items-center gap-1.5 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-600 hover:bg-green-100 transition"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              スクショ撮影
-            </button>
-            <span className="text-xs text-gray-400">
-              Ctrl+V でスクショ貼り付けも可能
-            </span>
-          </div>
         </div>
 
-        {/* Video URL */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">動画URL（任意）</label>
+          <label className={labelClass}>通常進行ラベル</label>
           <input
-            type="url"
-            value={step.videoUrl || ''}
-            onChange={(e) => onChange({ ...step, videoUrl: e.target.value })}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="https://www.youtube.com/watch?v=..."
+            type="text"
+            value={step.jumpDefaultLabel || ''}
+            onChange={(e) =>
+              onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })
+            }
+            className={inputClass}
+            placeholder="例: OK、合格"
           />
         </div>
 
-        {/* Related links */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">関連リンク（任意）</label>
-          {(step.links ?? []).map((link) => (
-            <div key={link.id} className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs text-gray-400">{link.type === 'instruction' ? '📄' : '🔗'}</span>
-              <span className="flex-1 text-sm text-gray-700 truncate">{link.label}</span>
-              <button
-                type="button"
-                onClick={() => onChange({ ...step, links: (step.links ?? []).filter(l => l.id !== link.id) })}
-                className="text-red-400 hover:text-red-600 text-xs"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2 flex-wrap mt-1">
-            <select
-              value=""
-              onChange={(e) => {
-                if (!e.target.value) return;
-                const all = getAllInstructions();
-                const inst = all.find(i => i.id === e.target.value);
-                if (!inst) return;
-                const newLink: StepLink = { id: uuidv4(), type: 'instruction', instructionId: inst.id, driveFileId: inst.driveFileId, label: inst.title };
-                onChange({ ...step, links: [...(step.links ?? []), newLink] });
-                e.target.value = '';
-              }}
-              className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
-            >
-              <option value="">+ 手順書を追加...</option>
-              {getAllInstructions().map(inst => (
-                <option key={inst.id} value={inst.id}>{inst.title}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const url = prompt('URLを入力してください');
-                if (!url) return;
-                const label = prompt('リンクの表示名を入力してください', url) || url;
-                const newLink: StepLink = { id: uuidv4(), type: 'url', url, label };
-                onChange({ ...step, links: [...(step.links ?? []), newLink] });
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800"
-            >
-              + URLを追加
-            </button>
-          </div>
-        </div>
-
-        {/* Conditional jumps */}
-        {allSteps && allSteps.length > 1 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">条件付きジャンプ（任意）</label>
-            {(step.jumps ?? []).map((jump) => {
-              const targetStep = allSteps.find(s => s.id === jump.targetStepId);
-              const targetIdx = allSteps.findIndex(s => s.id === jump.targetStepId);
-              return (
-                <div key={jump.id} className="flex items-center gap-2 mb-1.5">
-                  <span className="text-xs text-gray-400">↗</span>
-                  <span className="flex-1 text-sm text-gray-700 truncate">
-                    {jump.label} → {targetIdx >= 0 ? `${targetIdx + 1}. ${targetStep!.title || '(未入力)'}` : '(不明)'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onChange({ ...step, jumps: (step.jumps ?? []).filter(j => j.id !== jump.id) })}
-                    className="text-red-400 hover:text-red-600 text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            })}
-            {(step.jumps ?? []).length > 0 && (
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-0.5">通常進行ラベル</label>
-                <input
-                  type="text"
-                  value={step.jumpDefaultLabel || ''}
-                  onChange={(e) => onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })}
-                  className="w-48 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="例: OK、合格"
-                />
-              </div>
-            )}
-            {showJumpForm ? (
-              <div className="mt-1 p-2 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-                <input
-                  type="text"
-                  value={jumpLabel}
-                  onChange={(e) => setJumpLabel(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="ラベル（例: NG、不合格）"
-                />
-                <select
-                  value={jumpTargetId}
-                  onChange={(e) => setJumpTargetId(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 p-4 md:col-span-2">
+            <p className="mb-3 text-sm font-semibold text-slate-800">関連リンク</p>
+            <div className="space-y-2">
+              {(step.links ?? []).map((link) => (
+                <div
+                  key={link.id}
+                  className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"
                 >
-                  <option value="">ジャンプ先を選択...</option>
-                  {allSteps.filter(s => s.id !== step.id).map((s) => {
-                    const realIdx = allSteps.findIndex(a => a.id === s.id);
-                    return (
-                      <option key={s.id} value={s.id}>
-                        {realIdx + 1}. {s.title || '(未入力)'}
-                      </option>
-                    );
-                  })}
-                </select>
-                <div className="flex items-center gap-2">
+                  <span className="flex-1 truncate text-sm text-slate-700">{link.label}</span>
                   <button
                     type="button"
-                    disabled={!jumpLabel.trim() || !jumpTargetId}
-                    onClick={() => {
-                      const newJump: StepJump = { id: uuidv4(), label: jumpLabel.trim(), targetStepId: jumpTargetId };
-                      onChange({ ...step, jumps: [...(step.jumps ?? []), newJump] });
-                      setJumpLabel('');
-                      setJumpTargetId('');
-                      setShowJumpForm(false);
-                    }}
-                    className="px-3 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition disabled:opacity-50"
+                    onClick={() =>
+                      onChange({
+                        ...step,
+                        links: (step.links ?? []).filter((item) => item.id !== link.id),
+                      })
+                    }
+                    className="text-sm text-red-500 hover:text-red-700"
                   >
-                    追加
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowJumpForm(false); setJumpLabel(''); setJumpTargetId(''); }}
-                    className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800"
-                  >
-                    キャンセル
+                    削除
                   </button>
                 </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowJumpForm(true)}
-                className="text-sm text-blue-600 hover:text-blue-800 mt-1"
-              >
-                + ジャンプを追加
-              </button>
-            )}
-          </div>
-        )}
+              ))}
 
-        {/* Check items */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            チェック項目（任意）
-          </label>
-          {(step.checkItems ?? []).map((item, ci) => (
-            <div key={item.id} className="flex items-center gap-2 mb-1.5">
-              <span className="text-gray-400 text-sm">☐</span>
-              <input
-                type="text"
-                value={item.label}
+              <select
+                value=""
                 onChange={(e) => {
-                  const updated = [...(step.checkItems ?? [])];
-                  updated[ci] = { ...item, label: e.target.value };
-                  onChange({ ...step, checkItems: updated });
+                  if (!e.target.value) return;
+                  const all = getAllInstructions();
+                  const instruction = all.find((item) => item.id === e.target.value);
+                  if (!instruction) return;
+                  const newLink: StepLink = {
+                    id: uuidv4(),
+                    type: 'instruction',
+                    instructionId: instruction.id,
+                    driveFileId: instruction.driveFileId,
+                    label: instruction.title,
+                  };
+                  onChange({ ...step, links: [...(step.links ?? []), newLink] });
+                  e.target.value = '';
                 }}
-                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="チェック項目名を入力"
-              />
+                className={`${inputClass} text-xs`}
+              >
+                <option value="">+ 手順書を追加...</option>
+                {getAllInstructions().map((instruction) => (
+                  <option key={instruction.id} value={instruction.id}>
+                    {instruction.title}
+                  </option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 onClick={() => {
-                  const updated = (step.checkItems ?? []).filter((_, i) => i !== ci);
-                  onChange({ ...step, checkItems: updated.length > 0 ? updated : undefined });
+                  const url = prompt('URLを入力してください');
+                  if (!url) return;
+                  const label =
+                    prompt('リンクの表示名を入力してください', url) || url;
+                  const newLink: StepLink = {
+                    id: uuidv4(),
+                    type: 'url',
+                    url,
+                    label,
+                  };
+                  onChange({ ...step, links: [...(step.links ?? []), newLink] });
                 }}
-                className="text-red-400 hover:text-red-600 text-sm px-1"
+                className="text-sm font-medium text-blue-700 hover:text-blue-900"
               >
-                &times;
+                + URLを追加
               </button>
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              const newItem: CheckItem = { id: uuidv4(), label: '' };
-              onChange({ ...step, checkItems: [...(step.checkItems ?? []), newItem] });
-            }}
-            className="text-sm text-blue-600 hover:text-blue-800 mt-1"
-          >
-            + チェック項目を追加
-          </button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <p className="mb-3 text-sm font-semibold text-slate-800">条件付きジャンプ</p>
+            {allSteps && allSteps.length > 1 ? (
+              <div className="space-y-2">
+                {(step.jumps ?? []).map((jump) => {
+                  const targetStep = allSteps.find((item) => item.id === jump.targetStepId);
+                  const targetIndex = allSteps.findIndex(
+                    (item) => item.id === jump.targetStepId,
+                  );
+
+                  return (
+                    <div
+                      key={jump.id}
+                      className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    >
+                      <div className="flex gap-2">
+                        <span className="flex-1 truncate">
+                          {jump.label} →{' '}
+                          {targetIndex >= 0
+                            ? `${targetIndex + 1}. ${targetStep?.title || '(未入力)'}`
+                            : '(対象なし)'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onChange({
+                              ...step,
+                              jumps: (step.jumps ?? []).filter((item) => item.id !== jump.id),
+                            })
+                          }
+                          className="text-red-500"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {showJumpForm ? (
+                  <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+                    <input
+                      type="text"
+                      value={jumpLabel}
+                      onChange={(e) => setJumpLabel(e.target.value)}
+                      className={inputClass}
+                      placeholder="ラベル（例: NG、不合格）"
+                    />
+                    <select
+                      value={jumpTargetId}
+                      onChange={(e) => setJumpTargetId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">ジャンプ先を選択...</option>
+                      {allSteps
+                        .filter((item) => item.id !== step.id)
+                        .map((item) => {
+                          const realIndex = allSteps.findIndex((s) => s.id === item.id);
+                          return (
+                            <option key={item.id} value={item.id}>
+                              {realIndex + 1}. {item.title || '(未入力)'}
+                            </option>
+                          );
+                        })}
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={!jumpLabel.trim() || !jumpTargetId}
+                        onClick={() => {
+                          const newJump: StepJump = {
+                            id: uuidv4(),
+                            label: jumpLabel.trim(),
+                            targetStepId: jumpTargetId,
+                          };
+                          onChange({
+                            ...step,
+                            jumps: [...(step.jumps ?? []), newJump],
+                          });
+                          setJumpLabel('');
+                          setJumpTargetId('');
+                          setShowJumpForm(false);
+                        }}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        追加
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowJumpForm(false);
+                          setJumpLabel('');
+                          setJumpTargetId('');
+                        }}
+                        className="rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-white"
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowJumpForm(true)}
+                    className="text-sm font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    + ジャンプを追加
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                ステップが2件以上あると設定できます。
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <p className="mb-3 text-sm font-semibold text-slate-800">チェック項目</p>
+            <div className="space-y-2">
+              {(step.checkItems ?? []).map((item, itemIndex) => (
+                <div
+                  key={item.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2"
+                >
+                  <input
+                    type="text"
+                    value={item.label}
+                    onChange={(e) => {
+                      const updated = [...(step.checkItems ?? [])];
+                      updated[itemIndex] = { ...item, label: e.target.value };
+                      onChange({ ...step, checkItems: updated });
+                    }}
+                    className={`${inputClass} min-w-0 py-1.5`}
+                    placeholder="チェック項目名を入力"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = (step.checkItems ?? []).filter(
+                        (_, i) => i !== itemIndex,
+                      );
+                      onChange({
+                        ...step,
+                        checkItems: updated.length > 0 ? updated : undefined,
+                      });
+                    }}
+                    className="rounded-md px-2 py-2 text-sm text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const newItem: CheckItem = { id: uuidv4(), label: '' };
+                  onChange({
+                    ...step,
+                    checkItems: [...(step.checkItems ?? []), newItem],
+                  });
+                }}
+                className="text-sm font-medium text-blue-700 hover:text-blue-900"
+              >
+                + チェック項目を追加
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
       {annotatingIdx !== null && (
         <ImageAnnotationEditor
           imageDataUrl={images[annotatingIdx]}
@@ -587,9 +722,7 @@ export default function StepEditor({
             const updated = [...images];
             const originals = [...(step.originalImageDataUrls ?? [])];
             while (originals.length <= annotatingIdx) originals.push('');
-            if (!originals[annotatingIdx]) {
-              originals[annotatingIdx] = images[annotatingIdx];
-            }
+            if (!originals[annotatingIdx]) originals[annotatingIdx] = images[annotatingIdx];
             updated[annotatingIdx] = url;
             onChange({
               ...step,
@@ -610,13 +743,15 @@ export default function StepEditor({
               ...step,
               imageDataUrl: undefined,
               imageDataUrls: updated,
-              originalImageDataUrls: newOriginals.some(o => o) ? newOriginals : undefined,
+              originalImageDataUrls: newOriginals.some((item) => item)
+                ? newOriginals
+                : undefined,
             });
             setAnnotatingIdx(null);
           }}
           onClose={() => setAnnotatingIdx(null)}
         />
       )}
-    </div>
+    </section>
   );
 }

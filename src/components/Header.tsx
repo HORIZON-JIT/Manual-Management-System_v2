@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
 import HelpModal from './HelpModal';
@@ -12,11 +12,9 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [currentFolder, setCurrentFolder] = useState<DriveFolder | null>(null);
-
-  useEffect(() => {
-    setCurrentFolder(getTargetFolder());
-  }, []);
+  const [currentFolder, setCurrentFolder] = useState<DriveFolder | null>(() =>
+    typeof window === 'undefined' ? null : getTargetFolder()
+  );
 
   const handleFolderClick = () => {
     const auth = getAuthState();
@@ -31,60 +29,59 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition">
-            <span className="text-lg font-semibold tracking-tight">手順書作成システム</span>
+      <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 text-neutral-950 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+          <Link href="/" className="flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-950 text-sm font-semibold tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
+              H
+            </span>
+            <span className="truncate text-[15px] font-semibold tracking-[0.08em]">MANUAL SYSTEM</span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden items-center gap-1.5 md:flex">
             <button
               onClick={() => setShowHelp(true)}
-              className="px-2.5 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/10 transition"
-              title="使い方ガイド"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+              title="使い方"
+              aria-label="使い方"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
             <Link
               href="/"
-              className="px-3.5 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
+              className="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
             >
-              一覧
+              ホーム
             </Link>
             <Link
               href="/instructions/new"
-              className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium text-sm hover:from-blue-600 hover:to-indigo-600 transition shadow-sm"
+              className="rounded-md bg-neutral-950 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] transition hover:bg-neutral-800"
             >
-              + 新規作成
+              新規作成
             </Link>
-            <div className="ml-2 pl-2 border-l border-slate-700">
+            <div className="ml-3 border-l border-neutral-200 pl-3">
               <GoogleSignInButton />
             </div>
-            {/* Drive folder selector */}
             <button
               onClick={handleFolderClick}
-              className="px-3 py-1.5 rounded-lg text-sm border border-slate-600 hover:border-yellow-400 hover:bg-white/10 transition flex items-center gap-1.5 max-w-[180px]"
+              className="flex max-w-[220px] items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition hover:border-[#a48149]/40 hover:bg-[#fbfaf7]"
               title={currentFolder ? `保存先: ${currentFolder.name}` : 'Driveフォルダを指定'}
             >
-              <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 shrink-0 text-[#a48149]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span className="truncate text-slate-300">
-                {currentFolder ? currentFolder.name : '未設定'}
-              </span>
+              <span className="truncate">{currentFolder ? currentFolder.name : '保存先未設定'}</span>
             </button>
           </nav>
 
-          {/* Mobile hamburger */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-neutral-600 transition hover:bg-neutral-100 md:hidden"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="メニュー"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {menuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
@@ -94,60 +91,38 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
-          <nav className="md:hidden border-t border-slate-700/50 px-4 py-3 space-y-1 bg-slate-800/50">
+          <nav className="space-y-1 border-t border-neutral-200 bg-white px-4 py-3 md:hidden">
             <button
               onClick={() => { setMenuOpen(false); setShowHelp(true); }}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-2"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              使い方ガイド
+              使い方
             </button>
-            <Link
-              href="/"
-              className="block px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
-              onClick={() => setMenuOpen(false)}
-            >
-              一覧
+            <Link href="/" className="block rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100" onClick={() => setMenuOpen(false)}>
+              ホーム
             </Link>
-            <Link
-              href="/instructions/new"
-              className="block px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition"
-              onClick={() => setMenuOpen(false)}
-            >
-              + 新規作成
+            <Link href="/instructions/new" className="block rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100" onClick={() => setMenuOpen(false)}>
+              新規作成
             </Link>
             <div className="px-3 py-2">
               <GoogleSignInButton />
             </div>
-            {/* Mobile Drive folder selector */}
             <button
               onClick={() => { setMenuOpen(false); handleFolderClick(); }}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-2"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-100"
             >
-              <svg className="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 shrink-0 text-[#a48149]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span className="truncate">
-                {currentFolder ? `フォルダ: ${currentFolder.name}` : 'Driveフォルダを指定'}
-              </span>
+              <span className="truncate">{currentFolder ? `保存先: ${currentFolder.name}` : 'Driveフォルダを指定'}</span>
             </button>
           </nav>
         )}
       </header>
 
-      {/* Help Modal */}
       <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
-
-      {/* Drive Folder Picker Modal */}
-      <DriveFolderPicker
-        open={showFolderPicker}
-        onClose={() => setShowFolderPicker(false)}
-        onSelect={handleFolderSelected}
-      />
+      <DriveFolderPicker open={showFolderPicker} onClose={() => setShowFolderPicker(false)} onSelect={handleFolderSelected} />
     </>
   );
 }

@@ -16,7 +16,7 @@ export interface GoogleAuthState {
 
 export type AuthListener = (state: GoogleAuthState) => void;
 
-let authState: GoogleAuthState = {
+const authState: GoogleAuthState = {
   isInitialized: false,
   isSignedIn: false,
   accessToken: null,
