@@ -116,7 +116,7 @@ export default function HomePage() {
             Manual Management
           </h1>
           <p className="mt-5 max-w-xl text-[15px] leading-7 text-neutral-600">
-            業務手順を、作成から保存・共有まで静かに整えるためのワークスペースです。
+            業務手順を、作成から保存・共有まで整えるためのワークスペースです。
           </p>
         </div>
       </section>
