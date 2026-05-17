@@ -27,12 +27,27 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
 
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'default',
+          theme: 'base',
+          themeVariables: {
+            fontFamily: 'Inter, "Noto Sans JP", "Yu Gothic UI", sans-serif',
+            lineColor: '#6b7280',
+            primaryTextColor: '#111827',
+            clusterBkg: '#ffffff',
+            clusterBorder: '#e5e7eb',
+          },
+          themeCSS: `
+            .edgeLabel rect { fill: #ffffff !important; opacity: 0.96; }
+            .edgeLabel span, .edgeLabel p, .edgeLabel text { color: #374151 !important; font-size: 14px !important; }
+            .label text, .nodeLabel, .edgeLabel { letter-spacing: 0 !important; }
+            svg { max-width: none !important; height: auto !important; }
+          `,
           flowchart: {
-            useMaxWidth: true,
-            htmlLabels: true,
+            useMaxWidth: false,
+            htmlLabels: false,
             curve: 'linear',
-            padding: 15,
+            padding: 24,
+            nodeSpacing: 64,
+            rankSpacing: 84,
           },
         });
 
@@ -45,14 +60,18 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
           svgRef.current = containerRef.current.innerHTML;
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e ?? 'フロー図の生成に失敗しました'));
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e ?? 'フロー図の生成に失敗しました'));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     render();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [instruction]);
 
   const downloadSvg = () => {
@@ -79,80 +98,50 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
     URL.revokeObjectURL(a.href);
   };
 
-  const downloadPng = () => {
-    const svgEl = containerRef.current?.querySelector('svg');
-    if (!svgEl) return;
-    const data = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([data], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth * 2;
-      canvas.height = img.naturalHeight * 2;
-      const ctx = canvas.getContext('2d')!;
-      ctx.scale(2, 2);
-      ctx.drawImage(img, 0, 0);
-      canvas.toBlob((pngBlob) => {
-        if (pngBlob) {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(pngBlob);
-          a.download = `${instruction.title}_フロー図.png`;
-          a.click();
-          URL.revokeObjectURL(a.href);
-        }
-      }, 'image/png');
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
-  };
-
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+      <div className="flex h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-none flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-lg font-bold text-gray-800">フロー図</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          <button onClick={onClose} className="text-xl leading-none text-gray-400 hover:text-gray-600">
+            &times;
+          </button>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
-          {loading && <p className="text-sm text-gray-500 text-center py-8">読み込み中...</p>}
-          {error && <p className="text-sm text-red-600 text-center py-8">{error}</p>}
-          <div ref={containerRef} className="flex justify-center" />
+          {loading && <p className="py-8 text-center text-sm text-gray-500">読み込み中...</p>}
+          {error && <p className="py-8 text-center text-sm text-red-600">{error}</p>}
+          <div ref={containerRef} className="flex min-w-max justify-center overflow-visible" />
         </div>
 
         {!loading && !error && (
-          <div className="flex items-center justify-end gap-2 px-6 py-3 border-t flex-wrap">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
             <button
               onClick={copyMermaid}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
             >
-              {mermaidCopied ? 'コピー済' : 'Mermaidコピー'}
+              {mermaidCopied ? 'コピー済み' : 'Mermaidをコピー'}
             </button>
             <button
               onClick={downloadMermaid}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
             >
-              Mermaid保存
-            </button>
-            <button
-              onClick={downloadPng}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
-            >
-              画像保存
+              Mermaidを保存
             </button>
             <button
               onClick={downloadSvg}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
             >
-              SVG保存
+              SVGを保存
             </button>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-700 transition"
+              className="rounded-lg bg-slate-600 px-3 py-1.5 text-sm text-white transition hover:bg-slate-700"
             >
               閉じる
             </button>

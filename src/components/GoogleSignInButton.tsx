@@ -30,15 +30,15 @@ export default function GoogleSignInButton() {
           <img
             src={auth.userPhoto}
             alt=""
-            className="w-6 h-6 rounded-full ring-2 ring-slate-600"
+            className="h-7 w-7 rounded-full ring-1 ring-neutral-200"
           />
         )}
-        <span className="text-sm text-slate-300 hidden lg:inline">
+        <span className="hidden max-w-32 truncate text-sm text-neutral-600 lg:inline">
           {auth.userName || auth.userEmail}
         </span>
         <button
           onClick={signOut}
-          className="px-2.5 py-1 text-xs text-slate-300 border border-slate-600 rounded-lg hover:bg-white/10 hover:text-white transition"
+          className="rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
         >
           サインアウト
         </button>
@@ -49,9 +49,9 @@ export default function GoogleSignInButton() {
   return (
     <button
       onClick={signIn}
-      className="px-3 py-1.5 text-sm bg-white/10 text-white border border-slate-600 rounded-lg font-medium hover:bg-white/20 transition flex items-center gap-1.5"
+      className="flex min-w-40 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition hover:border-neutral-300 hover:bg-neutral-50"
     >
-      <svg className="w-4 h-4" viewBox="0 0 24 24">
+      <svg className="h-4 w-4" viewBox="0 0 24 24">
         <path
           fill="currentColor"
           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"

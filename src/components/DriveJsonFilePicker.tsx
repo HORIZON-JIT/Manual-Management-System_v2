@@ -1,59 +1,147 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { DriveFileInfo, getTargetFolder, listJsonFilesInFolder, downloadDriveFile } from '@/lib/googleDrive';
-import { getViewPageBaseUrl } from '@/lib/shareLink';
+import { useEffect, useState } from 'react';
+import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
 
 interface DriveJsonFilePickerProps {
   open: boolean;
   onClose: () => void;
-  onFileLoaded: (content: string, fileName: string) => void;
+  onFileLoaded: (content: string, file: DriveFileInfo) => void;
+}
+
+type SortOrder = 'updated-desc' | 'updated-asc';
+
+interface FileListItem extends DriveFileInfo {
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+function formatDate(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatSize(bytes?: number): string | null {
+  if (typeof bytes !== 'number' || Number.isNaN(bytes)) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: DriveJsonFilePickerProps) {
-  const [files, setFiles] = useState<DriveFileInfo[]>([]);
+  const [files, setFiles] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [folderName, setFolderName] = useState<string>('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [folderName, setFolderName] = useState('');
+  const [query, setQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('updated-desc');
+  const [createdByFilter, setCreatedByFilter] = useState('all');
+  const [updatedByFilter, setUpdatedByFilter] = useState('all');
+  const [metadataLoading, setMetadataLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+
     const folder = getTargetFolder();
     if (!folder) {
-      setError('Driveフォルダが指定されていません。ヘッダーのフォルダボタンから設定してください。');
+      setError('保存先の Drive フォルダが設定されていません。右上のフォルダボタンから設定してください。');
       setFolderName('');
       setFiles([]);
       return;
     }
+
     setFolderName(folder.name);
     setError(null);
     setLoading(true);
+
     listJsonFilesInFolder(folder.id)
       .then((jsonFiles) => {
         setFiles(jsonFiles);
         if (jsonFiles.length === 0) {
-          setError('このフォルダにJSONファイルがありません');
+          setError('このフォルダに JSON ファイルがありません。');
         }
       })
       .catch((err) => {
         console.error('Failed to list files:', err);
-        setError('ファイル一覧の取得に失敗しました');
+        setError('JSON ファイル一覧の取得に失敗しました。');
       })
       .finally(() => setLoading(false));
   }, [open]);
 
+  useEffect(() => {
+    if (!open || files.length === 0) return;
+
+    let cancelled = false;
+    const pending = files.filter((file) => file.createdBy === undefined && file.updatedBy === undefined);
+    if (pending.length === 0) return;
+
+    setMetadataLoading(true);
+
+    Promise.all(
+      pending.map(async (file) => {
+        try {
+          const content = await downloadDriveFile(file.id);
+          const json = JSON.parse(content) as { createdBy?: string; updatedBy?: string };
+          return {
+            id: file.id,
+            createdBy: json.createdBy?.trim() || file.ownerName || '',
+            updatedBy: json.updatedBy?.trim() || file.lastModifyingUserName || '',
+          };
+        } catch (err) {
+          console.error('Failed to load file metadata:', err);
+          return {
+            id: file.id,
+            createdBy: file.ownerName || '',
+            updatedBy: file.lastModifyingUserName || '',
+          };
+        }
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const metaMap = new Map(results.map((item) => [item.id, item]));
+        setFiles((prev) =>
+          prev.map((file) => {
+            const meta = metaMap.get(file.id);
+            return meta
+              ? {
+                  ...file,
+                  createdBy: meta.createdBy || undefined,
+                  updatedBy: meta.updatedBy || undefined,
+                }
+              : file;
+          }),
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setMetadataLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, files]);
+
   const handleFileSelect = async (file: DriveFileInfo) => {
     setDownloading(file.id);
     setError(null);
+
     try {
       const content = await downloadDriveFile(file.id);
       handleClose();
-      onFileLoaded(content, file.name);
+      onFileLoaded(content, file);
     } catch (err) {
       console.error('Failed to download file:', err);
-      setError('ファイルのダウンロードに失敗しました');
+      setError('ファイルの読み込みに失敗しました。');
     } finally {
       setDownloading(null);
     }
@@ -63,89 +151,194 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
     setFiles([]);
     setError(null);
     setDownloading(null);
+    setQuery('');
+    setSortOrder('updated-desc');
+    setCreatedByFilter('all');
+    setUpdatedByFilter('all');
     onClose();
   };
+
+  const createdByOptions = Array.from(
+    new Set(files.map((file) => file.createdBy).filter((value): value is string => !!value)),
+  ).sort((a, b) => a.localeCompare(b, 'ja'));
+
+  const updatedByOptions = Array.from(
+    new Set(files.map((file) => file.updatedBy).filter((value): value is string => !!value)),
+  ).sort((a, b) => a.localeCompare(b, 'ja'));
+
+  const filteredFiles = [...files]
+    .filter((file) => {
+      const normalizedQuery = query.trim().toLowerCase();
+      if (!normalizedQuery) return true;
+      return file.name.toLowerCase().includes(normalizedQuery);
+    })
+    .filter((file) => (createdByFilter === 'all' ? true : file.createdBy === createdByFilter))
+    .filter((file) => (updatedByFilter === 'all' ? true : file.updatedBy === updatedByFilter))
+    .sort((a, b) => {
+      const aTime = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+      const bTime = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+      return sortOrder === 'updated-desc' ? bTime - aTime : aTime - bTime;
+    });
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-800">JSONファイルを選択</h3>
-          {folderName && (
-            <p className="text-xs text-gray-500 mt-1">
-              フォルダ: <span className="font-medium text-emerald-700">{folderName}</span>
-            </p>
-          )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-[#fcfbf8] shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
+        <div className="flex items-start justify-between gap-6 border-b border-neutral-200 px-6 py-5 sm:px-7">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.22em] text-[#9a7a45]">DRIVE FILES</p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">手順書ファイルを選択</h3>
+            {folderName && (
+              <p className="mt-2 text-sm text-neutral-500">
+                保存先フォルダ: <span className="font-medium text-neutral-700">{folderName}</span>
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={handleClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-400 transition hover:text-neutral-700"
+            aria-label="閉じる"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* File list */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="mb-4 rounded-2xl border border-neutral-200 bg-white px-4 py-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">ファイル名で検索</span>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="ファイル名を入力"
+                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">更新日で並び替え</span>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="updated-desc">新しい順</option>
+                  <option value="updated-asc">古い順</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">作成者で絞り込み</span>
+                <select
+                  value={createdByFilter}
+                  onChange={(e) => setCreatedByFilter(e.target.value)}
+                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="all">すべて</option>
+                  {createdByOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">更新者で絞り込み</span>
+                <select
+                  value={updatedByFilter}
+                  onChange={(e) => setUpdatedByFilter(e.target.value)}
+                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="all">すべて</option>
+                  {updatedByOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400">
+              <span>{filteredFiles.length} 件表示</span>
+              {metadataLoading && <span>作成者・更新者を読み込み中...</span>}
+            </div>
+          </div>
+
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+            <div className="flex h-56 items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
               読み込み中...
             </div>
-          ) : files.length === 0 && !error ? (
-            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-              JSONファイルがありません
+          ) : filteredFiles.length === 0 && !error ? (
+            <div className="flex h-56 items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
+              条件に合うファイルがありません
             </div>
           ) : (
-            <ul className="space-y-1">
-              {files.map((file) => (
-                <li key={file.id} className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleFileSelect(file)}
-                    disabled={downloading !== null}
-                    className="flex-1 text-left px-3 py-3 rounded-lg hover:bg-emerald-50 flex items-center gap-3 text-sm transition disabled:opacity-50 min-w-0"
-                  >
-                    <span className="text-emerald-500 text-lg shrink-0">
-                      {downloading === file.id ? (
-                        <span className="inline-block w-5 h-5 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
-                      ) : (
-                        '{ }'
-                      )}
-                    </span>
-                    <span className="text-gray-700 truncate">{file.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = `${getViewPageBaseUrl()}?driveFileId=${file.id}`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedId(file.id);
-                      setTimeout(() => setCopiedId(null), 2000);
-                    }}
-                    className="shrink-0 px-2 py-1.5 text-xs rounded-md border transition"
-                    style={copiedId === file.id
-                      ? { backgroundColor: '#dcfce7', borderColor: '#86efac', color: '#166534' }
-                      : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb' }
-                    }
-                    title="閲覧リンクをコピー"
-                  >
-                    {copiedId === file.id ? 'コピー済' : 'URLコピー'}
-                  </button>
-                </li>
-              ))}
+            <ul className="space-y-3">
+              {filteredFiles.map((file) => {
+                const updatedAt = formatDate(file.modifiedTime);
+                const size = formatSize(file.size);
+                const isLoading = downloading === file.id;
+
+                return (
+                  <li key={file.id}>
+                    <button
+                      onClick={() => handleFileSelect(file)}
+                      disabled={downloading !== null}
+                      className="group flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-4 text-left transition hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600">
+                        {isLoading ? (
+                          <span className="inline-block h-5 w-5 rounded-full border-2 border-emerald-300 border-t-emerald-600 animate-spin" />
+                        ) : (
+                          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586A2 2 0 0114 3.586L18.414 8A2 2 0 0119 9.414V19a2 2 0 01-2 2z" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-lg font-medium text-neutral-900">{file.name}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
+                          {updatedAt && <span>更新: {updatedAt}</span>}
+                          {size && <span>サイズ: {size}</span>}
+                          {file.createdBy && <span>作成者: {file.createdBy}</span>}
+                          {file.updatedBy && <span>更新者: {file.updatedBy}</span>}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-neutral-300 transition group-hover:text-[#9a7a45]">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
 
-        {/* Error */}
         {error && (
-          <div className="px-4 py-2 text-sm text-red-600 text-center">
+          <div className="border-t border-red-100 bg-red-50 px-6 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        {/* Actions */}
-        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-end">
+        <div className="flex items-center justify-end border-t border-neutral-200 px-6 py-4">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+            className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-neutral-300 hover:text-neutral-800"
           >
-            キャンセル
+            閉じる
           </button>
         </div>
       </div>
