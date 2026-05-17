@@ -4,6 +4,7 @@ function esc(text: string): string {
   return text.replace(/"/g, '#quot;').replace(/[[\]{}()]/g, '');
 }
 
+
 export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   const steps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const conditions = instruction.conditions ?? [];
@@ -41,7 +42,8 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
   const lbl = (s: Step) => `"${esc(`${stepNum.get(s.id)}. ${s.title}`)}"`;
-  const dlbl = (s: Step) => `"　${esc(`${stepNum.get(s.id)}. ${s.title}`)}　"`;
+  const dlbl = (s: Step) => `"<br/>${esc(`${stepNum.get(s.id)}. ${s.title}`)}<br/>"`;
+
 
   interface GroupSegment {
     kind: 'group';
@@ -262,7 +264,7 @@ function buildLinear(steps: Step[]): string {
     const id = `s${i}`;
     const hasJumps = s.jumps && s.jumps.length > 0;
     if (hasJumps) {
-      lines.push(`  ${id}{"${esc(`${i + 1}. ${s.title}`)}"}`);
+      lines.push(`  ${id}{"<br/>${esc(`${i + 1}. ${s.title}`)}<br/>"}`);
     } else {
       lines.push(`  ${id}["${esc(`${i + 1}. ${s.title}`)}"]`);
     }
