@@ -41,6 +41,7 @@ export interface Step {
   links?: StepLink[];
   jumps?: StepJump[];
   jumpDefaultLabel?: string;
+  nextStepId?: string;
   endsBranch?: boolean;
 }
 
