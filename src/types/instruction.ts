@@ -40,6 +40,7 @@ export interface Step {
   links?: StepLink[];
   jumps?: StepJump[];
   jumpDefaultLabel?: string;
+  endsBranch?: boolean;
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
@@ -105,8 +106,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   packing: '梱包作業',
   事務作業: '事務作業',
   現場作業: '現場作業',
-  '莠句漁菴懈･ｭ': '事務作業',
-  '迴ｾ蝣ｴ菴懈･ｭ': '現場作業',
+  '菠句漁菴應･ｍ': '事務作業',
+  '迴ｿ蜃ｴ菴應･ｍ': '現場作業',
 };
 
 /** Get display label for a category (falls back to the raw value for custom categories) */
