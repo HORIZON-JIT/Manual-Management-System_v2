@@ -114,7 +114,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   事務作業: '事務作業',
   現場作業: '現場作業',
   '菠句漁菴應･ｍ': '事務作業',
-  '迴ｿ蜃ｲ菴應･ｍ': '現場作業',
+  '迄ｿ蜃ｲ菴應･ｍ': '現場作業',
 };
 
 /** Get display label for a category (falls back to the raw value for custom categories) */
