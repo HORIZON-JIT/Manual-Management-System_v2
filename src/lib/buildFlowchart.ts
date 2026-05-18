@@ -45,6 +45,7 @@ function pushHeader(lines: string[]) {
   lines.push('  classDef terminal fill:#F7FBFF,stroke:#4B8CF5,stroke-width:2px,color:#111827,font-size:18px,font-weight:600;');
   lines.push('  classDef process fill:#FFFFFF,stroke:#A3A3A3,stroke-width:1.5px,color:#111827,font-size:16px;');
   lines.push('  classDef decision fill:#FFF8E7,stroke:#E0A100,stroke-width:2px,color:#111827,font-size:16px;');
+  lines.push('  classDef merge fill:#F8FAFC,stroke:#CBD5E1,stroke-width:1.5px,color:#F8FAFC;');
   lines.push(`  START((${terminalLabel('開始')})):::terminal`);
 }
 
@@ -159,6 +160,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   let nodeCounter = 0;
   let decCounter = 0;
+  let mergeCounter = 0;
   const nid = new Map<string, string>();
 
   function nodeId(step: Step): string {
@@ -172,6 +174,20 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   function decisionNode(step: Step): string {
     return `${nodeId(step)}{${decisionLabel(stepNum, step)}}:::decision`;
+  }
+
+  function createMergeNode(fromIds: string[]): string {
+    const mergeId = `m${mergeCounter++}`;
+    lines.push(`  ${mergeId}(( )):::merge`);
+    for (const fromId of fromIds) {
+      lines.push(`  ${fromId} --> ${mergeId}`);
+    }
+    return mergeId;
+  }
+
+  function collapseExits(exits: string[]): string[] {
+    if (exits.length <= 1) return exits;
+    return [createMergeNode(exits)];
   }
 
   function emitBranch(branchSteps: Step[], conditionId: string): { firstNode: string | null; exits: string[] } {
@@ -220,8 +236,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
       prev = id;
       if (step.endsBranch) {
-        lines.push(`  ${id} --> END`);
-        return { firstNode, exits: [] };
+        return { firstNode, exits: [id] };
       }
     }
 
@@ -247,8 +262,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       }
 
       if (branchEndsHere) {
-        lines.push(`  ${decId} --> END`);
-        return { firstNode, exits: [] };
+        return { firstNode, exits: [decId] };
       }
 
       const nestedConds = groupConds.get(childGroupIds[0]) ?? [];
@@ -267,12 +281,11 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         }
       }
 
-      return { firstNode, exits: allExits };
+      return { firstNode, exits: collapseExits(allExits) };
     }
 
     if (branchEndsHere && prev) {
-      lines.push(`  ${prev} --> END`);
-      return { firstNode, exits: [] };
+      return { firstNode, exits: [prev] };
     }
 
     return { firstNode, exits: prev ? [prev] : [] };
@@ -287,11 +300,12 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       const hasJumps = !!(seg.step.jumps && seg.step.jumps.length > 0);
       lines.push(`  ${hasJumps ? decisionNode(seg.step) : processNode(seg.step)}`);
 
+      const incoming = !prevLabel ? collapseExits(prev) : prev;
       if (prevLabel) {
-        for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${id}`);
+        for (const p of incoming) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${id}`);
         prevLabel = null;
       } else {
-        for (const p of prev) lines.push(`  ${p} --> ${id}`);
+        for (const p of incoming) lines.push(`  ${p} --> ${id}`);
       }
 
       if (hasJumps) {
@@ -306,12 +320,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         }
       }
 
-      if (seg.step.endsBranch && getStepConditionIds(seg.step).length > 0) {
-        lines.push(`  ${id} --> END`);
-        prev = [];
-      } else {
-        prev = [id];
-      }
+      prev = [id];
       continue;
     }
 
@@ -324,11 +333,12 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       lines.push(`  ${decId}{${plainDecisionLabel('条件')}}:::decision`);
     }
 
+    const incoming = !prevLabel ? collapseExits(prev) : prev;
     if (prevLabel) {
-      for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${decId}`);
+      for (const p of incoming) lines.push(`  ${p} -- "${esc(prevLabel)}" --> ${decId}`);
       prevLabel = null;
     } else {
-      for (const p of prev) lines.push(`  ${p} --> ${decId}`);
+      for (const p of incoming) lines.push(`  ${p} --> ${decId}`);
     }
 
     for (const jump of seg.decisionStep?.jumps ?? []) {
@@ -348,14 +358,15 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         lines.push(`  ${decId} -- "${esc(branch.cond.label)}" --> END`);
       }
     }
-    prev = allExits;
+    prev = collapseExits(allExits);
   }
 
   lines.push(`  END((${terminalLabel('終了')})):::terminal`);
+  const finalPrev = !prevLabel ? collapseExits(prev) : prev;
   if (prevLabel) {
-    for (const p of prev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> END`);
+    for (const p of finalPrev) lines.push(`  ${p} -- "${esc(prevLabel)}" --> END`);
   } else {
-    for (const p of prev) lines.push(`  ${p} --> END`);
+    for (const p of finalPrev) lines.push(`  ${p} --> END`);
   }
 
   return lines.join('\n');
