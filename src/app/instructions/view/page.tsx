@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense, Fragment } from 'react';
+import { useEffect, useState, Suspense, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -172,35 +172,24 @@ function InstructionViewContent() {
   const hasConditions = !!instruction.conditions?.length;
   const isSequential = !!instruction.sequential;
 
-  const condGroupMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const condition of instruction.conditions ?? []) {
-      map.set(condition.id, condition.group || '__default');
-    }
-    return map;
-  }, [instruction.conditions]);
+  const condGroupMap = new Map<string, string>();
+  for (const condition of instruction.conditions ?? []) {
+    condGroupMap.set(condition.id, condition.group || '__default');
+  }
 
-  const groupConditions = useMemo(() => {
-    const map = new Map<string, NonNullable<WorkInstruction['conditions']>>();
-    for (const condition of instruction.conditions ?? []) {
-      const groupId = condition.group || '__default';
-      if (!map.has(groupId)) map.set(groupId, []);
-      map.get(groupId)!.push(condition);
-    }
-    return map;
-  }, [instruction.conditions]);
+  const groupConditions = new Map<string, NonNullable<WorkInstruction['conditions']>>();
+  for (const condition of instruction.conditions ?? []) {
+    const groupId = condition.group || '__default';
+    if (!groupConditions.has(groupId)) groupConditions.set(groupId, []);
+    groupConditions.get(groupId)!.push(condition);
+  }
 
-  const stepIndex = useMemo(() => {
-    const map = new Map<string, number>();
-    sortedSteps.forEach((step, index) => map.set(step.id, index));
-    return map;
-  }, [sortedSteps]);
-
-  const stepById = useMemo(() => {
-    const map = new Map<string, Step>();
-    sortedSteps.forEach((step) => map.set(step.id, step));
-    return map;
-  }, [sortedSteps]);
+  const stepIndex = new Map<string, number>();
+  const stepById = new Map<string, Step>();
+  sortedSteps.forEach((step, index) => {
+    stepIndex.set(step.id, index);
+    stepById.set(step.id, step);
+  });
 
   const getStepGroups = (step: Step): string[] => {
     const groups: string[] = [];
@@ -272,16 +261,14 @@ function InstructionViewContent() {
     return null;
   };
 
-  const visibleSteps = useMemo(() => {
-    const firstStep = sortedSteps.find((step) => stepMatchesSelection(step));
-    if (!firstStep) return [] as Step[];
-
-    const result: Step[] = [];
+  const visibleSteps: Step[] = [];
+  const firstStep = sortedSteps.find((step) => stepMatchesSelection(step));
+  if (firstStep) {
     const visited = new Set<string>();
     let current: Step | null = firstStep;
 
     while (current && !visited.has(current.id)) {
-      result.push(current);
+      visibleSteps.push(current);
       visited.add(current.id);
 
       if (current.endsBranch) break;
@@ -300,26 +287,22 @@ function InstructionViewContent() {
 
       current = nextStep;
     }
-
-    return result;
-  }, [selectedConditions, sortedSteps]);
+  }
 
   const stepNumbers: number[] = [];
-  {
-    let logicalNumber = 0;
-    const seenGroups = new Set<string>();
-    for (const step of visibleSteps) {
-      const groupId = getPrimaryStepGroup(step);
-      if (groupId) {
-        if (!seenGroups.has(groupId)) {
-          logicalNumber += 1;
-          seenGroups.add(groupId);
-        }
-      } else {
+  let logicalNumber = 0;
+  const seenGroups = new Set<string>();
+  for (const step of visibleSteps) {
+    const groupId = getPrimaryStepGroup(step);
+    if (groupId) {
+      if (!seenGroups.has(groupId)) {
         logicalNumber += 1;
+        seenGroups.add(groupId);
       }
-      stepNumbers.push(logicalNumber);
+    } else {
+      logicalNumber += 1;
     }
+    stepNumbers.push(logicalNumber);
   }
 
   return (
