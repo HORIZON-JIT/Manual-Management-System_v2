@@ -178,7 +178,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   function createRouteNode(): string {
     const routeId = `r${routeCounter++}`;
-    lines.push(`  ${routeId}[""]:::route`);
+    lines.push(`  ${routeId}[" "]:::route`);
     return routeId;
   }
 
