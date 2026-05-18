@@ -1,4 +1,4 @@
-import { WorkInstruction, Step, Condition } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, getStepConditionIds } from '@/types/instruction';
 
 function esc(text: string): string {
   return text.replace(/\"/g, '#quot;').replace(/[[\\]{}()]/g, '');
@@ -81,6 +81,17 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
 
   const isNestedGroup = (gid: string) => !!groupParent.get(gid);
 
+  const getStepGroupIds = (step: Step): string[] => {
+    const groupIds: string[] = [];
+    for (const conditionId of getStepConditionIds(step)) {
+      const groupId = condGroupMap.get(conditionId);
+      if (groupId && !groupIds.includes(groupId)) groupIds.push(groupId);
+    }
+    return groupIds;
+  };
+
+  const getPrimaryStepGroupId = (step: Step) => getStepGroupIds(step)[0];
+
   const stepNum = new Map<string, number>();
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
 
@@ -96,7 +107,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   const groupsSeen = new Set<string>();
 
   for (const step of steps) {
-    const gid = step.conditionId ? condGroupMap.get(step.conditionId) : undefined;
+    const gid = getPrimaryStepGroupId(step);
     if (!gid) {
       segments.push({ kind: 'step', step });
       continue;
@@ -108,7 +119,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     const condsInGroup = groupConds.get(gid) ?? [];
     const branches = condsInGroup.map((c) => ({
       cond: c,
-      steps: steps.filter((s) => s.conditionId === c.id),
+      steps: steps.filter((s) => getStepConditionIds(s).includes(c.id)),
     }));
 
     const hasSteps = branches.some((b) => b.steps.length > 0);
@@ -223,7 +234,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       const allExits: string[] = [];
 
       for (const nestedCond of nestedConds) {
-        const nestedSteps = steps.filter((s) => s.conditionId === nestedCond.id);
+        const nestedSteps = steps.filter((s) => getStepConditionIds(s).includes(nestedCond.id));
         const result = emitBranch(nestedSteps, nestedCond.id);
         if (result.firstNode) {
           lines.push(`  ${decId} -- "${esc(nestedCond.label)}" --> ${result.firstNode}`);
@@ -272,7 +283,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         }
       }
 
-      if (seg.step.endsBranch && seg.step.conditionId) {
+      if (seg.step.endsBranch && getStepConditionIds(seg.step).length > 0) {
         lines.push(`  ${id} --> END`);
         prev = [];
       } else {
