@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { WorkInstruction, InstructionSnapshot, Step, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { WorkInstruction, InstructionSnapshot, Step, getCategoryLabel, getImageCaption, getStepConditionIds, getStepImages } from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
 import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
@@ -157,8 +157,17 @@ function InstructionViewContent() {
       groupConditions.get(g)!.push(c);
     }
   }
-  const getStepGroup = (s: { conditionId?: string }) =>
-    s.conditionId ? condGroupMap.get(s.conditionId) : undefined;
+
+  const getStepGroups = (s: Step): string[] => {
+    const groups: string[] = [];
+    for (const conditionId of getStepConditionIds(s)) {
+      const group = condGroupMap.get(conditionId);
+      if (group && !groups.includes(group)) groups.push(group);
+    }
+    return groups;
+  };
+
+  const getPrimaryStepGroup = (s: Step) => getStepGroups(s)[0];
 
   const groupMetaMap = new Map<string, { parentConditionId?: string }>();
   for (const g of instruction.conditionGroups ?? []) {
@@ -181,16 +190,21 @@ function InstructionViewContent() {
   };
 
   const branchVisibleSteps = hasConditions
-    ? sortedSteps.filter((s) => {
-        const group = getStepGroup(s);
-        if (!group) return true;
-        if (!isGroupVisible(group)) return false;
-        const sel = selectedConditions[group];
-        if (sel === undefined || sel === null) {
-          const firstCond = groupConditions.get(group)?.[0];
-          return firstCond ? s.conditionId === firstCond.id : true;
-        }
-        return s.conditionId === sel;
+    ? sortedSteps.filter((step) => {
+        const stepConditionIds = getStepConditionIds(step);
+        if (stepConditionIds.length === 0) return true;
+
+        const stepGroups = getStepGroups(step);
+        if (stepGroups.length === 0) return true;
+        if (stepGroups.some((group) => !isGroupVisible(group))) return false;
+
+        return stepGroups.every((group) => {
+          const selectedConditionId = selectedConditions[group];
+          const activeConditionId =
+            selectedConditionId ?? groupConditions.get(group)?.[0]?.id ?? null;
+          if (!activeConditionId) return true;
+          return stepConditionIds.includes(activeConditionId);
+        });
       })
     : sortedSteps;
 
@@ -199,7 +213,7 @@ function InstructionViewContent() {
   for (const step of branchVisibleSteps) {
     if (branchEnded) break;
     visibleSteps.push(step);
-    if (step.conditionId && step.endsBranch) {
+    if (getStepConditionIds(step).length > 0 && step.endsBranch) {
       branchEnded = true;
     }
   }
@@ -208,8 +222,8 @@ function InstructionViewContent() {
   {
     let logicalNum = 0;
     const seenGroups = new Set<string>();
-    for (const s of visibleSteps) {
-      const group = getStepGroup(s);
+    for (const step of visibleSteps) {
+      const group = getPrimaryStepGroup(step);
       if (group) {
         if (!seenGroups.has(group)) {
           logicalNum++;
@@ -318,8 +332,8 @@ function InstructionViewContent() {
       <div className="space-y-4">
         {(isSequential ? visibleSteps.slice(0, revealedCount) : visibleSteps).map((step, index) => {
           const prevStep = index > 0 ? visibleSteps[index - 1] : null;
-          const group = getStepGroup(step);
-          const prevGroup = prevStep ? getStepGroup(prevStep) : undefined;
+          const group = getPrimaryStepGroup(step);
+          const prevGroup = prevStep ? getPrimaryStepGroup(prevStep) : undefined;
           const showInlineTabs = hasConditions && !!group && group !== prevGroup;
           const zoneConds = group ? groupConditions.get(group) ?? [] : [];
           const zoneSel = group ? (selectedConditions[group] ?? null) : null;
