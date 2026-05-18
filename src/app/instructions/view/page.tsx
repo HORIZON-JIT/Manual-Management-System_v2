@@ -251,7 +251,7 @@ function InstructionViewContent() {
       const candidateConditions = getStepConditionIds(candidate);
 
       if (candidateConditions.length === 0) return candidate;
-      if (sourceConditions.length === 0) continue;
+      if (sourceConditions.length === 0) return candidate;
 
       const sourceContainsCandidate = candidateConditions.every((id) => sourceConditions.includes(id));
       const candidateContainsSource = sourceConditions.every((id) => candidateConditions.includes(id));
