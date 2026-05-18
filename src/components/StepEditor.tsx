@@ -51,6 +51,7 @@ export default function StepEditor({
   const images = getStepImages(step);
   const stepRef = useRef(step);
   const imagesRef = useRef(images);
+  const isConditionalStep = !!step.conditionId;
 
   useEffect(() => {
     stepRef.current = step;
@@ -286,7 +287,11 @@ export default function StepEditor({
             <select
               value={step.conditionId ?? ''}
               onChange={(e) =>
-                onChange({ ...step, conditionId: e.target.value || undefined })
+                onChange({
+                  ...step,
+                  conditionId: e.target.value || undefined,
+                  endsBranch: e.target.value ? step.endsBranch : undefined,
+                })
               }
               className={inputClass}
             >
@@ -345,6 +350,33 @@ export default function StepEditor({
             placeholder="注意すべきポイントがあれば入力"
           />
         </div>
+
+        {isConditionalStep && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={!!step.endsBranch}
+                onChange={(e) =>
+                  onChange({
+                    ...step,
+                    endsBranch: e.target.checked || undefined,
+                    jumpDefaultLabel: e.target.checked ? undefined : step.jumpDefaultLabel,
+                  })
+                }
+                className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-amber-900">
+                  このルートをここで終了する
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-amber-700">
+                  条件分岐で選ばれたこのルートは、このステップの後に他のフローへ合流せず終了します。
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -465,7 +497,8 @@ export default function StepEditor({
               onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })
             }
             className={inputClass}
-            placeholder="例: OK、合格"
+            placeholder={step.endsBranch ? 'このルートを終了する設定中は使用しません' : '例: OK、合格'}
+            disabled={!!step.endsBranch}
           />
         </div>
 
