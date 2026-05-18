@@ -1,7 +1,7 @@
 import { WorkInstruction, Step, Condition } from '@/types/instruction';
 
 function esc(text: string): string {
-  return text.replace(/"/g, '#quot;').replace(/[[\]{}()]/g, '');
+  return text.replace(/\"/g, '#quot;').replace(/[[\\]{}()]/g, '');
 }
 
 function wrapLabel(text: string, maxLength: number): string {
@@ -10,7 +10,7 @@ function wrapLabel(text: string, maxLength: number): string {
 
   for (const char of text) {
     current += char;
-    if (current.length >= maxLength && /[、。・,.\s]/.test(char)) {
+    if (current.length >= maxLength && /[\u3001\u3002\u30fb,.\s]/.test(char)) {
       chunks.push(current.trim());
       current = '';
     }
@@ -148,8 +148,12 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     const childGroupIds = nestedGroupsByParentCond.get(conditionId) ?? [];
     const hasNesting = childGroupIds.length > 0;
 
-    const regularSteps = hasNesting ? branchSteps.slice(0, -1) : branchSteps;
-    const nestingStep = hasNesting ? branchSteps[branchSteps.length - 1] : null;
+    const branchCutIndex = branchSteps.findIndex((step) => step.endsBranch);
+    const effectiveBranchSteps = branchCutIndex >= 0 ? branchSteps.slice(0, branchCutIndex + 1) : branchSteps;
+
+    const regularSteps = hasNesting ? effectiveBranchSteps.slice(0, -1) : effectiveBranchSteps;
+    const nestingStep = hasNesting ? effectiveBranchSteps[effectiveBranchSteps.length - 1] : null;
+    const branchEndsHere = !!effectiveBranchSteps[effectiveBranchSteps.length - 1]?.endsBranch;
 
     let firstNode: string | null = null;
     let prev: string | null = null;
@@ -177,18 +181,30 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
             lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
           }
         }
-        if (step.jumpDefaultLabel) {
+        if (step.jumpDefaultLabel && !step.endsBranch) {
           branchPrevLabel = step.jumpDefaultLabel;
         }
       }
 
       prev = id;
+      if (step.endsBranch) {
+        lines.push(`  ${id} --> END`);
+        return { firstNode, exits: [] };
+      }
     }
 
     if (nestingStep) {
       const decId = nodeId(nestingStep);
-      lines.push(`  ${decisionNode(nestingStep)}`);
-      if (prev) lines.push(`  ${prev} --> ${decId}`);
+      const hasJumps = !!(nestingStep.jumps && nestingStep.jumps.length > 0);
+      lines.push(`  ${hasJumps ? decisionNode(nestingStep) : processNode(nestingStep)}`);
+      if (prev) {
+        if (branchPrevLabel) {
+          lines.push(`  ${prev} -- "${esc(branchPrevLabel)}" --> ${decId}`);
+          branchPrevLabel = null;
+        } else {
+          lines.push(`  ${prev} --> ${decId}`);
+        }
+      }
       if (!firstNode) firstNode = decId;
 
       for (const jump of nestingStep.jumps ?? []) {
@@ -196,6 +212,11 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         if (targetStep) {
           lines.push(`  ${decId} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
         }
+      }
+
+      if (branchEndsHere) {
+        lines.push(`  ${decId} --> END`);
+        return { firstNode, exits: [] };
       }
 
       const nestedConds = groupConds.get(childGroupIds[0]) ?? [];
@@ -208,11 +229,16 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
           lines.push(`  ${decId} -- "${esc(nestedCond.label)}" --> ${result.firstNode}`);
           allExits.push(...result.exits);
         } else {
-          allExits.push(decId);
+          lines.push(`  ${decId} -- "${esc(nestedCond.label)}" --> END`);
         }
       }
 
-      return { firstNode, exits: allExits.length > 0 ? allExits : [decId] };
+      return { firstNode, exits: allExits };
+    }
+
+    if (branchEndsHere && prev) {
+      lines.push(`  ${prev} --> END`);
+      return { firstNode, exits: [] };
     }
 
     return { firstNode, exits: prev ? [prev] : [] };
@@ -241,12 +267,17 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
             lines.push(`  ${id} -- "${esc(jump.label)}" --> ${nodeId(targetStep)}`);
           }
         }
-        if (seg.step.jumpDefaultLabel) {
+        if (seg.step.jumpDefaultLabel && !seg.step.endsBranch) {
           prevLabel = seg.step.jumpDefaultLabel;
         }
       }
 
-      prev = [id];
+      if (seg.step.endsBranch && seg.step.conditionId) {
+        lines.push(`  ${id} --> END`);
+        prev = [];
+      } else {
+        prev = [id];
+      }
       continue;
     }
 
@@ -280,10 +311,10 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
         lines.push(`  ${decId} -- "${esc(branch.cond.label)}" --> ${result.firstNode}`);
         allExits.push(...result.exits);
       } else {
-        allExits.push(decId);
+        lines.push(`  ${decId} -- "${esc(branch.cond.label)}" --> END`);
       }
     }
-    prev = allExits.length > 0 ? allExits : [decId];
+    prev = allExits;
   }
 
   lines.push(`  END((${terminalLabel('終了')})):::terminal`);
