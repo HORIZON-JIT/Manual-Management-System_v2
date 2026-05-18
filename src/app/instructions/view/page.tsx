@@ -184,6 +184,12 @@ function InstructionViewContent() {
     groupConditions.get(groupId)!.push(condition);
   }
 
+  const groupOrder: string[] = [];
+  for (const condition of instruction.conditions ?? []) {
+    const groupId = condition.group || '__default';
+    if (!groupOrder.includes(groupId)) groupOrder.push(groupId);
+  }
+
   const stepIndex = new Map<string, number>();
   const stepById = new Map<string, Step>();
   sortedSteps.forEach((step, index) => {
@@ -239,6 +245,47 @@ function InstructionViewContent() {
     });
   };
 
+  const getBranchFirstStep = (conditionId: string): Step | null => {
+    for (const step of sortedSteps) {
+      if (getStepConditionIds(step).includes(conditionId) && stepMatchesSelection(step)) {
+        return step;
+      }
+    }
+    return null;
+  };
+
+  const branchAnchorByStepId = new Map<string, string[]>();
+  for (const groupId of groupOrder) {
+    const branchStarts = (groupConditions.get(groupId) ?? [])
+      .map((condition) => getBranchFirstStep(condition.id))
+      .filter((step): step is Step => !!step);
+
+    if (branchStarts.length === 0) continue;
+
+    const earliestIndex = Math.min(
+      ...branchStarts.map((step) => stepIndex.get(step.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    if (earliestIndex > 0) {
+      const anchorStep = sortedSteps[earliestIndex - 1];
+      const current = branchAnchorByStepId.get(anchorStep.id) ?? [];
+      branchAnchorByStepId.set(anchorStep.id, [...current, groupId]);
+    }
+  }
+
+  const resolveBranchNextStep = (step: Step): Step | null => {
+    const branchGroups = branchAnchorByStepId.get(step.id) ?? [];
+    for (const groupId of branchGroups) {
+      if (!isGroupVisible(groupId)) continue;
+      const options = groupConditions.get(groupId) ?? [];
+      const activeConditionId = selectedConditions[groupId] ?? options[0]?.id ?? null;
+      if (!activeConditionId) continue;
+      const branchStep = getBranchFirstStep(activeConditionId);
+      if (branchStep) return branchStep;
+    }
+    return null;
+  };
+
   const resolveFallbackNextStep = (step: Step): Step | null => {
     const startIndex = stepIndex.get(step.id);
     if (startIndex === undefined) return null;
@@ -273,8 +320,8 @@ function InstructionViewContent() {
 
       if (current.endsBranch) break;
 
-      let nextStep: Step | null = null;
-      if (current.nextStepId && current.nextStepId !== current.id) {
+      let nextStep = resolveBranchNextStep(current);
+      if (!nextStep && current.nextStepId && current.nextStepId !== current.id) {
         const explicitTarget = stepById.get(current.nextStepId);
         if (explicitTarget && stepMatchesSelection(explicitTarget)) {
           nextStep = explicitTarget;
