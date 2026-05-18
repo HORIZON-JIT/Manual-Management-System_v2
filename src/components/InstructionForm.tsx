@@ -20,6 +20,7 @@ import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
+import FlowchartModal from './FlowchartModal';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
 const fieldClass =
@@ -75,6 +76,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [keywordsText, setKeywordsText] = useState(initialData?.keywords?.join(', ') || '');
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('none');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showFlowchart, setShowFlowchart] = useState(false);
   const [conditions, setConditions] = useState<Condition[]>(() => {
     const raw = initialData?.conditions ?? [];
     if (raw.length === 0) return [];
@@ -193,6 +195,35 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       }
       return updated;
     });
+  };
+
+  const buildPreviewInstruction = (): WorkInstruction => {
+    const parsedKeywords = keywordsText
+      .split(/[,\s]+/)
+      .map((keyword) => keyword.trim())
+      .filter(Boolean);
+    const now = new Date().toISOString();
+
+    return {
+      id: initialData?.id || 'preview',
+      title: title.trim() || '作成中の手順書',
+      category,
+      description: description.trim(),
+      steps,
+      createdAt: initialData?.createdAt || now,
+      updatedAt: now,
+      createdBy: initialData?.createdBy || authorName.trim() || undefined,
+      updatedBy: isEdit && authorName.trim() ? authorName.trim() : initialData?.updatedBy,
+      keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
+      conditions: conditions.length > 0 ? conditions : undefined,
+      conditionGroups: (() => {
+        const groups = Object.entries(groupParents)
+          .filter((entry): entry is [string, string] => !!entry[1])
+          .map(([id, parentConditionId]) => ({ id, parentConditionId }));
+        return groups.length > 0 ? groups : undefined;
+      })(),
+      sequential: sequential || undefined,
+    };
   };
 
   const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
@@ -798,6 +829,13 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
                 <button
                   type="button"
+                  onClick={() => setShowFlowchart(true)}
+                  className="w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  作成中のフローチャートを表示
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleDraftSave(true)}
                   disabled={saving}
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
@@ -931,6 +969,13 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {showFlowchart && (
+        <FlowchartModal
+          instruction={buildPreviewInstruction()}
+          onClose={() => setShowFlowchart(false)}
+        />
       )}
 
       {showVersionHistory && initialData?.updateHistory && (
