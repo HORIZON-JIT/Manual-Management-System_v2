@@ -1,4 +1,4 @@
-'use client';
+'use client';
 
 import { useEffect, useState, Suspense, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -197,12 +197,9 @@ function InstructionViewContent() {
   const visibleSteps: Step[] = [];
   let branchEnded = false;
   for (const step of branchVisibleSteps) {
-    const isConditionalStep = !!step.conditionId;
-    if (branchEnded && !isConditionalStep) {
-      break;
-    }
+    if (branchEnded) break;
     visibleSteps.push(step);
-    if (isConditionalStep && step.endsBranch) {
+    if (step.conditionId && step.endsBranch) {
       branchEnded = true;
     }
   }
