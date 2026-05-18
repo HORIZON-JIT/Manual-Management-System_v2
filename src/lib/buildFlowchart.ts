@@ -90,7 +90,26 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     return groupIds;
   };
 
-  const getPrimaryStepGroupId = (step: Step) => getStepGroupIds(step)[0];
+  const getGroupDepth = (groupId: string, visited = new Set<string>()): number => {
+    if (visited.has(groupId)) return 0;
+    visited.add(groupId);
+    const parentConditionId = groupParent.get(groupId);
+    if (!parentConditionId) return 0;
+    const parentGroupId = condGroupMap.get(parentConditionId);
+    if (!parentGroupId) return 0;
+    return getGroupDepth(parentGroupId, visited) + 1;
+  };
+
+  const getOwningStepGroupId = (step: Step): string | undefined => {
+    const groupIds = getStepGroupIds(step);
+    if (groupIds.length === 0) return undefined;
+
+    return [...groupIds].sort((a, b) => {
+      const depthDiff = getGroupDepth(b) - getGroupDepth(a);
+      if (depthDiff !== 0) return depthDiff;
+      return groupIds.indexOf(a) - groupIds.indexOf(b);
+    })[0];
+  };
 
   const stepNum = new Map<string, number>();
   steps.forEach((s, i) => stepNum.set(s.id, i + 1));
@@ -107,7 +126,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   const groupsSeen = new Set<string>();
 
   for (const step of steps) {
-    const gid = getPrimaryStepGroupId(step);
+    const gid = getOwningStepGroupId(step);
     if (!gid) {
       segments.push({ kind: 'step', step });
       continue;
@@ -119,7 +138,9 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     const condsInGroup = groupConds.get(gid) ?? [];
     const branches = condsInGroup.map((c) => ({
       cond: c,
-      steps: steps.filter((s) => getStepConditionIds(s).includes(c.id)),
+      steps: steps.filter(
+        (s) => getOwningStepGroupId(s) === gid && getStepConditionIds(s).includes(c.id),
+      ),
     }));
 
     const hasSteps = branches.some((b) => b.steps.length > 0);
@@ -234,7 +255,9 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
       const allExits: string[] = [];
 
       for (const nestedCond of nestedConds) {
-        const nestedSteps = steps.filter((s) => getStepConditionIds(s).includes(nestedCond.id));
+        const nestedSteps = steps.filter(
+          (s) => getOwningStepGroupId(s) === childGroupIds[0] && getStepConditionIds(s).includes(nestedCond.id),
+        );
         const result = emitBranch(nestedSteps, nestedCond.id);
         if (result.firstNode) {
           lines.push(`  ${decId} -- "${esc(nestedCond.label)}" --> ${result.firstNode}`);
