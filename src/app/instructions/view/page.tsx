@@ -1,13 +1,28 @@
 'use client';
 
-import { useEffect, useState, Suspense, Fragment } from 'react';
+import { useEffect, useMemo, useState, Suspense, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { WorkInstruction, InstructionSnapshot, Step, getCategoryLabel, getImageCaption, getStepConditionIds, getStepImages } from '@/types/instruction';
+import {
+  WorkInstruction,
+  InstructionSnapshot,
+  Step,
+  getCategoryLabel,
+  getImageCaption,
+  getStepConditionIds,
+  getStepImages,
+} from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
 import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
-import { isGoogleConfigured, getAuthState, addAuthListener, GoogleAuthState, signIn, initGoogleAuth } from '@/lib/googleAuth';
+import {
+  isGoogleConfigured,
+  getAuthState,
+  addAuthListener,
+  GoogleAuthState,
+  signIn,
+  initGoogleAuth,
+} from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
@@ -46,35 +61,39 @@ function InstructionViewContent() {
     }
 
     if (searchParams.get('source') === 'preview') {
-      getTempData('preview_instruction').then((raw) => {
-        if (raw) {
-          try {
-            setInstruction(JSON.parse(raw) as WorkInstruction);
-            setIsPreviewView(true);
-          } catch {
-            // fall through
+      getTempData('preview_instruction')
+        .then((raw) => {
+          if (raw) {
+            try {
+              setInstruction(JSON.parse(raw) as WorkInstruction);
+              setIsPreviewView(true);
+            } catch {
+              // fall through
+            }
           }
-        }
-        setLoading(false);
-      }).catch(() => setLoading(false));
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
       return;
     }
 
     const driveFileId = searchParams.get('driveFileId');
     if (driveFileId) {
-      initGoogleAuth().then(() => {
-        const state = getAuthState();
-        if (!state.isSignedIn) {
-          setLoading(false);
-          return;
-        }
-        return downloadDriveFile(driveFileId)
-          .then((text) => {
-            const data = JSON.parse(text) as WorkInstruction;
-            setInstruction(data);
-          })
-          .catch(() => setInstruction(null));
-      }).finally(() => setLoading(false));
+      initGoogleAuth()
+        .then(() => {
+          const state = getAuthState();
+          if (!state.isSignedIn) {
+            setLoading(false);
+            return;
+          }
+          return downloadDriveFile(driveFileId)
+            .then((text) => {
+              const data = JSON.parse(text) as WorkInstruction;
+              setInstruction(data);
+            })
+            .catch(() => setInstruction(null));
+        })
+        .finally(() => setLoading(false));
       return;
     }
 
@@ -115,7 +134,9 @@ function InstructionViewContent() {
     if (driveFileId && !auth.isSignedIn) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 px-4">
-          <p className="text-slate-700 text-base font-medium">この手順書を閲覧するにはGoogleログインが必要です</p>
+          <p className="text-slate-700 text-base font-medium">
+            この手順書を閲覧するにはGoogleログインが必要です
+          </p>
           {isGoogleConfigured() && (
             <button
               onClick={() => signIn()}
@@ -130,6 +151,7 @@ function InstructionViewContent() {
         </div>
       );
     }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
         <p className="text-slate-500 text-lg">手順書が見つかりません</p>
@@ -140,103 +162,165 @@ function InstructionViewContent() {
     );
   }
 
-  const sortedSteps = [...(viewingSnapshot?.steps ?? instruction.steps)].sort((a, b) => a.orderIndex - b.orderIndex);
+  const sortedSteps = [...(viewingSnapshot?.steps ?? instruction.steps)].sort(
+    (a, b) => a.orderIndex - b.orderIndex,
+  );
   const displayTitle = viewingSnapshot?.title ?? instruction.title;
   const displayDescription = viewingSnapshot?.description ?? instruction.description;
   const displayCategory = viewingSnapshot?.category ?? instruction.category;
   const displayKeywords = viewingSnapshot?.keywords ?? instruction.keywords;
-  const hasConditions = instruction.conditions && instruction.conditions.length > 0;
+  const hasConditions = !!instruction.conditions?.length;
+  const isSequential = !!instruction.sequential;
 
-  const condGroupMap = new Map<string, string>();
-  const groupConditions = new Map<string, typeof instruction.conditions>();
-  if (hasConditions && instruction.conditions) {
-    for (const c of instruction.conditions) {
-      const g = c.group || '__default';
-      condGroupMap.set(c.id, g);
-      if (!groupConditions.has(g)) groupConditions.set(g, []);
-      groupConditions.get(g)!.push(c);
+  const condGroupMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const condition of instruction.conditions ?? []) {
+      map.set(condition.id, condition.group || '__default');
     }
-  }
+    return map;
+  }, [instruction.conditions]);
 
-  const getStepGroups = (s: Step): string[] => {
+  const groupConditions = useMemo(() => {
+    const map = new Map<string, NonNullable<WorkInstruction['conditions']>>();
+    for (const condition of instruction.conditions ?? []) {
+      const groupId = condition.group || '__default';
+      if (!map.has(groupId)) map.set(groupId, []);
+      map.get(groupId)!.push(condition);
+    }
+    return map;
+  }, [instruction.conditions]);
+
+  const stepIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    sortedSteps.forEach((step, index) => map.set(step.id, index));
+    return map;
+  }, [sortedSteps]);
+
+  const stepById = useMemo(() => {
+    const map = new Map<string, Step>();
+    sortedSteps.forEach((step) => map.set(step.id, step));
+    return map;
+  }, [sortedSteps]);
+
+  const getStepGroups = (step: Step): string[] => {
     const groups: string[] = [];
-    for (const conditionId of getStepConditionIds(s)) {
-      const group = condGroupMap.get(conditionId);
-      if (group && !groups.includes(group)) groups.push(group);
+    for (const conditionId of getStepConditionIds(step)) {
+      const groupId = condGroupMap.get(conditionId);
+      if (groupId && !groups.includes(groupId)) groups.push(groupId);
     }
     return groups;
   };
 
-  const getPrimaryStepGroup = (s: Step) => getStepGroups(s)[0];
+  const getPrimaryStepGroup = (step: Step) => getStepGroups(step)[0];
 
   const groupMetaMap = new Map<string, { parentConditionId?: string }>();
-  for (const g of instruction.conditionGroups ?? []) {
-    groupMetaMap.set(g.id, g);
+  for (const group of instruction.conditionGroups ?? []) {
+    groupMetaMap.set(group.id, group);
   }
+
   const isGroupVisible = (groupId: string, visited = new Set<string>()): boolean => {
     if (visited.has(groupId)) return true;
     visited.add(groupId);
     const meta = groupMetaMap.get(groupId);
     if (!meta?.parentConditionId) return true;
-    const parentGroup = condGroupMap.get(meta.parentConditionId);
-    if (!parentGroup) return true;
-    if (!isGroupVisible(parentGroup, visited)) return false;
-    const parentSel = selectedConditions[parentGroup];
-    if (parentSel === null || parentSel === undefined) {
-      const firstCond = groupConditions.get(parentGroup)?.[0];
-      return firstCond ? firstCond.id === meta.parentConditionId : true;
+    const parentGroupId = condGroupMap.get(meta.parentConditionId);
+    if (!parentGroupId) return true;
+    if (!isGroupVisible(parentGroupId, visited)) return false;
+    const parentSelection = selectedConditions[parentGroupId];
+    if (parentSelection === null || parentSelection === undefined) {
+      const firstParentCondition = groupConditions.get(parentGroupId)?.[0];
+      return firstParentCondition ? firstParentCondition.id === meta.parentConditionId : true;
     }
-    return parentSel === meta.parentConditionId;
+    return parentSelection === meta.parentConditionId;
   };
 
-  const branchVisibleSteps = hasConditions
-    ? sortedSteps.filter((step) => {
-        const stepConditionIds = getStepConditionIds(step);
-        if (stepConditionIds.length === 0) return true;
+  const stepMatchesSelection = (step: Step): boolean => {
+    const stepConditionIds = getStepConditionIds(step);
+    if (stepConditionIds.length === 0) return true;
 
-        const stepGroups = getStepGroups(step);
-        if (stepGroups.length === 0) return true;
-        if (stepGroups.some((group) => !isGroupVisible(group))) return false;
+    const stepGroups = getStepGroups(step);
+    if (stepGroups.length === 0) return true;
+    if (stepGroups.some((groupId) => !isGroupVisible(groupId))) return false;
 
-        return stepGroups.every((group) => {
-          const selectedConditionId = selectedConditions[group];
-          const activeConditionId =
-            selectedConditionId ?? groupConditions.get(group)?.[0]?.id ?? null;
-          if (!activeConditionId) return true;
-          return stepConditionIds.includes(activeConditionId);
-        });
-      })
-    : sortedSteps;
+    return stepGroups.every((groupId) => {
+      const selectedConditionId = selectedConditions[groupId];
+      const activeConditionId = selectedConditionId ?? groupConditions.get(groupId)?.[0]?.id ?? null;
+      if (!activeConditionId) return true;
+      return stepConditionIds.includes(activeConditionId);
+    });
+  };
 
-  const visibleSteps: Step[] = [];
-  let branchEnded = false;
-  for (const step of branchVisibleSteps) {
-    if (branchEnded) break;
-    visibleSteps.push(step);
-    if (getStepConditionIds(step).length > 0 && step.endsBranch) {
-      branchEnded = true;
+  const resolveFallbackNextStep = (step: Step): Step | null => {
+    const startIndex = stepIndex.get(step.id);
+    if (startIndex === undefined) return null;
+
+    for (let index = startIndex + 1; index < sortedSteps.length; index += 1) {
+      const candidate = sortedSteps[index];
+      if (!stepMatchesSelection(candidate)) continue;
+
+      const sourceConditions = getStepConditionIds(step);
+      const candidateConditions = getStepConditionIds(candidate);
+
+      if (candidateConditions.length === 0) return candidate;
+      if (sourceConditions.length === 0) continue;
+
+      const sourceContainsCandidate = candidateConditions.every((id) => sourceConditions.includes(id));
+      const candidateContainsSource = sourceConditions.every((id) => candidateConditions.includes(id));
+      if (sourceContainsCandidate || candidateContainsSource) return candidate;
     }
-  }
+
+    return null;
+  };
+
+  const visibleSteps = useMemo(() => {
+    const firstStep = sortedSteps.find((step) => stepMatchesSelection(step));
+    if (!firstStep) return [] as Step[];
+
+    const result: Step[] = [];
+    const visited = new Set<string>();
+    let current: Step | null = firstStep;
+
+    while (current && !visited.has(current.id)) {
+      result.push(current);
+      visited.add(current.id);
+
+      if (current.endsBranch) break;
+
+      let nextStep: Step | null = null;
+      if (current.nextStepId && current.nextStepId !== current.id) {
+        const explicitTarget = stepById.get(current.nextStepId);
+        if (explicitTarget && stepMatchesSelection(explicitTarget)) {
+          nextStep = explicitTarget;
+        }
+      }
+
+      if (!nextStep) {
+        nextStep = resolveFallbackNextStep(current);
+      }
+
+      current = nextStep;
+    }
+
+    return result;
+  }, [selectedConditions, sortedSteps]);
 
   const stepNumbers: number[] = [];
   {
-    let logicalNum = 0;
+    let logicalNumber = 0;
     const seenGroups = new Set<string>();
     for (const step of visibleSteps) {
-      const group = getPrimaryStepGroup(step);
-      if (group) {
-        if (!seenGroups.has(group)) {
-          logicalNum++;
-          seenGroups.add(group);
+      const groupId = getPrimaryStepGroup(step);
+      if (groupId) {
+        if (!seenGroups.has(groupId)) {
+          logicalNumber += 1;
+          seenGroups.add(groupId);
         }
       } else {
-        logicalNum++;
+        logicalNumber += 1;
       }
-      stepNumbers.push(logicalNum);
+      stepNumbers.push(logicalNumber);
     }
   }
-
-  const isSequential = !!instruction.sequential;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -250,7 +334,7 @@ function InstructionViewContent() {
             {viewUrlCopied ? 'URLをコピー済み' : 'アプリ閲覧URL'}
           </button>
         )}
-        {instruction.updateHistory && instruction.updateHistory.some((e) => !!e.snapshot) && (
+        {instruction.updateHistory && instruction.updateHistory.some((entry) => !!entry.snapshot) && (
           <button
             onClick={() => setShowHistory(true)}
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
@@ -299,30 +383,32 @@ function InstructionViewContent() {
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">{displayTitle}</h1>
           <span
             className={`shrink-0 text-sm px-3 py-1 rounded-full font-medium ${
-              displayCategory === 'pc_work'
-                ? 'bg-blue-50 text-blue-600'
-                : 'bg-orange-50 text-orange-600'
+              displayCategory === 'pc_work' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
             }`}
           >
             {getCategoryLabel(displayCategory)}
           </span>
         </div>
-        {displayDescription && (
-          <p className="text-slate-600 mb-4">{displayDescription}</p>
-        )}
+        {displayDescription && <p className="text-slate-600 mb-4">{displayDescription}</p>}
         <div className="text-xs text-slate-400 flex flex-wrap gap-4">
-          <span>作成日: {new Date(instruction.createdAt).toLocaleDateString('ja-JP')}{instruction.createdBy ? ` (${instruction.createdBy})` : ''}</span>
-          <span>更新日: {new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}{instruction.updatedBy ? ` (${instruction.updatedBy})` : ''}</span>
+          <span>
+            作成日: {new Date(instruction.createdAt).toLocaleDateString('ja-JP')}
+            {instruction.createdBy ? ` (${instruction.createdBy})` : ''}
+          </span>
+          <span>
+            更新日: {new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}
+            {instruction.updatedBy ? ` (${instruction.updatedBy})` : ''}
+          </span>
           <span>{sortedSteps.length} ステップ</span>
         </div>
         {displayKeywords && displayKeywords.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {displayKeywords.map((kw, i) => (
+            {displayKeywords.map((keyword, index) => (
               <span
-                key={i}
+                key={`${keyword}-${index}`}
                 className="inline-block text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200"
               >
-                {kw}
+                {keyword}
               </span>
             ))}
           </div>
@@ -331,27 +417,29 @@ function InstructionViewContent() {
 
       <div className="space-y-4">
         {(isSequential ? visibleSteps.slice(0, revealedCount) : visibleSteps).map((step, index) => {
-          const prevStep = index > 0 ? visibleSteps[index - 1] : null;
-          const group = getPrimaryStepGroup(step);
-          const prevGroup = prevStep ? getPrimaryStepGroup(prevStep) : undefined;
-          const showInlineTabs = hasConditions && !!group && group !== prevGroup;
-          const zoneConds = group ? groupConditions.get(group) ?? [] : [];
-          const zoneSel = group ? (selectedConditions[group] ?? null) : null;
+          const previousStep = index > 0 ? visibleSteps[index - 1] : null;
+          const groupId = getPrimaryStepGroup(step);
+          const previousGroupId = previousStep ? getPrimaryStepGroup(previousStep) : undefined;
+          const showInlineTabs = hasConditions && !!groupId && groupId !== previousGroupId;
+          const groupOptions = groupId ? groupConditions.get(groupId) ?? [] : [];
+          const selectedGroupCondition = groupId ? (selectedConditions[groupId] ?? null) : null;
           const isLastRevealed = isSequential && index === Math.min(revealedCount, visibleSteps.length) - 1;
 
           return (
             <Fragment key={step.id}>
-              {showInlineTabs && group && (
+              {showInlineTabs && groupId && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
                   <p className="text-xs text-slate-500 mb-2 font-medium">条件で表示を切り替え</p>
                   <div className="flex gap-2 flex-wrap">
-                    {zoneConds.map((cond, condIdx) => {
-                      const isActive = zoneSel === cond.id || (zoneSel === null && condIdx === 0);
+                    {groupOptions.map((condition, conditionIndex) => {
+                      const isActive =
+                        selectedGroupCondition === condition.id ||
+                        (selectedGroupCondition === null && conditionIndex === 0);
                       return (
                         <button
-                          key={cond.id}
+                          key={condition.id}
                           onClick={() => {
-                            setSelectedConditions((prev) => ({ ...prev, [group]: cond.id }));
+                            setSelectedConditions((prev) => ({ ...prev, [groupId]: condition.id }));
                             setRevealedCount(1);
                           }}
                           className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
@@ -360,13 +448,14 @@ function InstructionViewContent() {
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                           }`}
                         >
-                          {cond.label}
+                          {condition.label}
                         </button>
                       );
                     })}
                   </div>
                 </div>
               )}
+
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3.5 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -379,9 +468,7 @@ function InstructionViewContent() {
 
                 <div className="p-5 space-y-4">
                   {step.description && (
-                    <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
-                      {step.description}
-                    </p>
+                    <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{step.description}</p>
                   )}
 
                   {getStepImages(step).map((imgUrl, imgIdx) => (
@@ -404,11 +491,12 @@ function InstructionViewContent() {
                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 space-y-1.5">
                       <p className="text-xs font-medium text-indigo-700 mb-1">関連リンク</p>
                       {step.links.map((link) => {
-                        const href = link.type === 'instruction'
-                          ? link.driveFileId
-                            ? `/instructions/view?driveFileId=${link.driveFileId}`
-                            : `/instructions/view?id=${link.instructionId}`
-                          : link.url;
+                        const href =
+                          link.type === 'instruction'
+                            ? link.driveFileId
+                              ? `/instructions/view?driveFileId=${link.driveFileId}`
+                              : `/instructions/view?id=${link.instructionId}`
+                            : link.url;
                         return (
                           <a
                             key={link.id}
@@ -418,7 +506,12 @@ function InstructionViewContent() {
                             className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 transition"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                              />
                             </svg>
                             {link.label}
                           </a>
@@ -431,11 +524,12 @@ function InstructionViewContent() {
                     <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 space-y-1.5">
                       <p className="text-xs font-medium text-purple-700 mb-1">条件付きジャンプ</p>
                       {step.jumps.map((jump) => {
-                        const targetStep = sortedSteps.find((s) => s.id === jump.targetStepId);
-                        const targetIdx = sortedSteps.findIndex((s) => s.id === jump.targetStepId);
+                        const targetStep = sortedSteps.find((candidate) => candidate.id === jump.targetStepId);
+                        const targetIndex = sortedSteps.findIndex((candidate) => candidate.id === jump.targetStepId);
                         return (
                           <p key={jump.id} className="text-sm text-purple-800">
-                            {jump.label} → ステップ {targetIdx >= 0 ? targetIdx + 1 : '?'}{targetStep ? `. ${targetStep.title}` : ''}
+                            {jump.label} → ステップ {targetIndex >= 0 ? targetIndex + 1 : '?'}
+                            {targetStep ? `. ${targetStep.title}` : ''}
                           </p>
                         );
                       })}
@@ -449,7 +543,12 @@ function InstructionViewContent() {
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                       <div className="flex items-start gap-1.5 text-sm text-amber-800 font-medium">
                         <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                          />
                         </svg>
                         <p className="whitespace-pre-wrap leading-6">注意: {step.caution}</p>
                       </div>
@@ -464,12 +563,12 @@ function InstructionViewContent() {
                           <input
                             type="checkbox"
                             checked={checkStates[step.id]?.[item.id] ?? false}
-                            onChange={(e) => {
+                            onChange={(event) => {
                               setCheckStates((prev) => ({
                                 ...prev,
                                 [step.id]: {
                                   ...(prev[step.id] ?? {}),
-                                  [item.id]: e.target.checked,
+                                  [item.id]: event.target.checked,
                                 },
                               }));
                             }}
@@ -477,7 +576,11 @@ function InstructionViewContent() {
                           />
                           <span
                             className="text-sm text-blue-800"
-                            style={checkStates[step.id]?.[item.id] ? { textDecoration: 'line-through', opacity: 0.5 } : undefined}
+                            style={
+                              checkStates[step.id]?.[item.id]
+                                ? { textDecoration: 'line-through', opacity: 0.5 }
+                                : undefined
+                            }
                           >
                             {item.label}
                           </span>
@@ -487,6 +590,7 @@ function InstructionViewContent() {
                   )}
                 </div>
               </div>
+
               {isLastRevealed && (
                 <div className="flex items-center justify-between no-print">
                   <span className="text-sm text-slate-500">
@@ -494,7 +598,7 @@ function InstructionViewContent() {
                   </span>
                   {revealedCount < visibleSteps.length ? (
                     <button
-                      onClick={() => setRevealedCount((c) => c + 1)}
+                      onClick={() => setRevealedCount((count) => count + 1)}
                       className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
                     >
                       次へ
@@ -532,10 +636,7 @@ function InstructionViewContent() {
       )}
 
       {showFlowchart && (
-        <FlowchartModal
-          instruction={instruction}
-          onClose={() => setShowFlowchart(false)}
-        />
+        <FlowchartModal instruction={instruction} onClose={() => setShowFlowchart(false)} />
       )}
     </div>
   );
@@ -543,7 +644,13 @@ function InstructionViewContent() {
 
 export default function InstructionViewPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><p className="text-slate-500">読み込み中...</p></div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p className="text-slate-500">読み込み中...</p>
+        </div>
+      }
+    >
       <InstructionViewContent />
     </Suspense>
   );
