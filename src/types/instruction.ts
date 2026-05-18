@@ -36,11 +36,18 @@ export interface Step {
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
+  conditionIds?: string[];
   originalImageDataUrls?: string[];
   links?: StepLink[];
   jumps?: StepJump[];
   jumpDefaultLabel?: string;
   endsBranch?: boolean;
+}
+
+export function getStepConditionIds(step: Step): string[] {
+  if (step.conditionIds && step.conditionIds.length > 0) return step.conditionIds;
+  if (step.conditionId) return [step.conditionId];
+  return [];
 }
 
 /** Get all image data URLs for a step (handles legacy single-image field) */
@@ -107,7 +114,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   事務作業: '事務作業',
   現場作業: '現場作業',
   '菠句漁菴應･ｍ': '事務作業',
-  '迴ｿ蜃ｴ菴應･ｍ': '現場作業',
+  '迴ｿ蜃ｲ菴應･ｍ': '現場作業',
 };
 
 /** Get display label for a category (falls back to the raw value for custom categories) */
