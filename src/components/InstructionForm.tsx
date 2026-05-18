@@ -11,6 +11,7 @@ import {
   UpdateHistoryEntry,
   InstructionSnapshot,
   InstructionStatus,
+  getStepConditionIds,
 } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
@@ -166,9 +167,22 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const removeCondition = (condId: string) => {
     setConditions((prev) => prev.filter((c) => c.id !== condId));
     setSteps((prev) =>
-      prev.map((step) =>
-        step.conditionId === condId ? { ...step, conditionId: undefined } : step,
-      ),
+      prev.map((step) => {
+        const remainingConditionIds = getStepConditionIds(step).filter((id) => id !== condId);
+        if (remainingConditionIds.length === 0) {
+          return {
+            ...step,
+            conditionId: undefined,
+            conditionIds: undefined,
+            endsBranch: undefined,
+          };
+        }
+        return {
+          ...step,
+          conditionId: remainingConditionIds[0],
+          conditionIds: remainingConditionIds,
+        };
+      }),
     );
     setGroupParents((prev) => {
       const updated = { ...prev };
@@ -183,9 +197,22 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     const condIds = new Set(conditions.filter((c) => c.group === groupId).map((c) => c.id));
     setConditions((prev) => prev.filter((c) => c.group !== groupId));
     setSteps((prev) =>
-      prev.map((step) =>
-        condIds.has(step.conditionId ?? '') ? { ...step, conditionId: undefined } : step,
-      ),
+      prev.map((step) => {
+        const remainingConditionIds = getStepConditionIds(step).filter((id) => !condIds.has(id));
+        if (remainingConditionIds.length === 0) {
+          return {
+            ...step,
+            conditionId: undefined,
+            conditionIds: undefined,
+            endsBranch: undefined,
+          };
+        }
+        return {
+          ...step,
+          conditionId: remainingConditionIds[0],
+          conditionIds: remainingConditionIds,
+        };
+      }),
     );
     setGroupParents((prev) => {
       const updated = { ...prev };
