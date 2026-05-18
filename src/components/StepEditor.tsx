@@ -30,6 +30,8 @@ interface StepEditorProps {
 const inputClass =
   'w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100';
 const labelClass = 'mb-1.5 block text-sm font-semibold text-slate-700';
+const AUTO_NEXT_VALUE = '__auto__';
+const END_NEXT_VALUE = '__end__';
 
 export default function StepEditor({
   step,
@@ -230,6 +232,33 @@ export default function StepEditor({
     });
   };
 
+  const nextStepSelectionValue = step.endsBranch
+    ? END_NEXT_VALUE
+    : step.nextStepId || AUTO_NEXT_VALUE;
+
+  const handleNextStepSelection = (value: string) => {
+    if (value === AUTO_NEXT_VALUE) {
+      onChange({ ...step, nextStepId: undefined, endsBranch: undefined });
+      return;
+    }
+
+    if (value === END_NEXT_VALUE) {
+      onChange({
+        ...step,
+        nextStepId: undefined,
+        endsBranch: true,
+        jumpDefaultLabel: undefined,
+      });
+      return;
+    }
+
+    onChange({
+      ...step,
+      nextStepId: value,
+      endsBranch: undefined,
+    });
+  };
+
   return (
     <section
       ref={containerRef}
@@ -393,32 +422,31 @@ export default function StepEditor({
           />
         </div>
 
-        {isConditionalStep && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={!!step.endsBranch}
-                onChange={(e) =>
-                  onChange({
-                    ...step,
-                    endsBranch: e.target.checked || undefined,
-                    jumpDefaultLabel: e.target.checked ? undefined : step.jumpDefaultLabel,
-                  })
-                }
-                className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-              />
-              <span>
-                <span className="block text-sm font-semibold text-amber-900">
-                  このルートをここで終了する
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-amber-700">
-                  条件分岐で選ばれたこのルートは、このステップの後に他のフローへ合流せず終了します。
-                </span>
-              </span>
-            </label>
-          </div>
-        )}
+        <div>
+          <label className={labelClass}>次に進む先</label>
+          <select
+            value={nextStepSelectionValue}
+            onChange={(e) => handleNextStepSelection(e.target.value)}
+            className={inputClass}
+          >
+            <option value={AUTO_NEXT_VALUE}>自動判定</option>
+            <option value={END_NEXT_VALUE}>ここで終了</option>
+            {(allSteps ?? [])
+              .filter((item) => item.id !== step.id)
+              .map((item) => {
+                const realIndex = (allSteps ?? []).findIndex((candidate) => candidate.id === item.id);
+                return (
+                  <option key={item.id} value={item.id}>
+                    {realIndex + 1}. {item.title || '(未入力)'}
+                  </option>
+                );
+              })}
+          </select>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            自動判定を選ぶと並び順をもとに次のステップを決めます。終了を選ぶと、このステップでフローを終えます。
+            {isConditionalStep ? ' 条件付きステップでは、この設定を使って分岐後の合流先を明示できます。' : ''}
+          </p>
+        </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -539,7 +567,7 @@ export default function StepEditor({
               onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })
             }
             className={inputClass}
-            placeholder={step.endsBranch ? 'このルートを終了する設定中は使用しません' : '例: OK、合格'}
+            placeholder={step.endsBranch ? 'このステップを終了設定中は使用しません' : '例: OK、合格'}
             disabled={!!step.endsBranch}
           />
         </div>
