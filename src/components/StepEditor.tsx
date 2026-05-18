@@ -50,6 +50,7 @@ export default function StepEditor({
   const [showJumpForm, setShowJumpForm] = useState(false);
   const [jumpLabel, setJumpLabel] = useState('');
   const [jumpTargetId, setJumpTargetId] = useState('');
+  const [showConditions, setShowConditions] = useState(false);
 
   const images = getStepImages(step);
   const stepRef = useRef(step);
@@ -57,6 +58,12 @@ export default function StepEditor({
   const selectedConditionIds = getStepConditionIds(step);
   const selectedConditionSet = new Set(selectedConditionIds);
   const isConditionalStep = selectedConditionIds.length > 0;
+  const selectedConditionLabels = (conditions ?? [])
+    .filter((condition) => selectedConditionSet.has(condition.id))
+    .map((condition) => condition.label)
+    .filter(Boolean);
+  const conditionSummary =
+    selectedConditionLabels.length > 0 ? selectedConditionLabels.join('、') : '共通';
 
   useEffect(() => {
     stepRef.current = step;
@@ -330,62 +337,87 @@ export default function StepEditor({
       <div className="space-y-5 p-5">
         {conditions && conditions.length > 0 && (
           <div>
-            <label className={labelClass}>表示条件</label>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <button
-                type="button"
-                onClick={() => updateSelectedConditions([])}
-                className={`mb-3 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                  selectedConditionIds.length === 0
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                共通（すべての条件で表示）
-              </button>
-
-              <div className="space-y-3">
-                {groupedConditions.groupOrder.map((groupId, groupIndex) => (
-                  <div key={groupId} className="rounded-lg border border-slate-200 bg-white p-3">
-                    {groupedConditions.groupOrder.length > 1 && (
-                      <p className="mb-2 text-xs font-semibold text-slate-500">
-                        グループ {String.fromCharCode(65 + groupIndex)}
-                      </p>
-                    )}
-                    <div className="space-y-2">
-                      {groupedConditions.grouped.get(groupId)!.map((condition, conditionIndex) => {
-                        const checked = selectedConditionSet.has(condition.id);
-                        return (
-                          <label key={condition.id} className="flex cursor-pointer items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(event) => {
-                                if (event.target.checked) {
-                                  updateSelectedConditions([...selectedConditionIds, condition.id]);
-                                } else {
-                                  updateSelectedConditions(
-                                    selectedConditionIds.filter((id) => id !== condition.id),
-                                  );
-                                }
-                              }}
-                              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-slate-700">
-                              {condition.label || `条件 ${conditionIndex + 1}`}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+            <button
+              type="button"
+              onClick={() => setShowConditions((prev) => !prev)}
+              className="flex w-full items-start justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+            >
+              <div>
+                <p className="text-sm font-semibold text-slate-700">表示条件</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{conditionSummary}</p>
               </div>
+              <svg
+                className={`mt-0.5 h-5 w-5 text-slate-400 transition ${showConditions ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
 
-              <p className="mt-3 text-xs leading-5 text-slate-500">
-                複数選ぶと、選んだ条件すべてでこのステップを表示します。何も選ばない場合は共通ステップとして扱います。
-              </p>
-            </div>
+            {showConditions && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <button
+                  type="button"
+                  onClick={() => updateSelectedConditions([])}
+                  className={`mb-3 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    selectedConditionIds.length === 0
+                      ? 'border-blue-300 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  共通（すべての条件で表示）
+                </button>
+
+                <div className="space-y-3">
+                  {groupedConditions.groupOrder.map((groupId, groupIndex) => (
+                    <div key={groupId} className="rounded-lg border border-slate-200 bg-white p-3">
+                      {groupedConditions.groupOrder.length > 1 && (
+                        <p className="mb-2 text-xs font-semibold text-slate-500">
+                          グループ {String.fromCharCode(65 + groupIndex)}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        {groupedConditions.grouped.get(groupId)!.map((condition, conditionIndex) => {
+                          const checked = selectedConditionSet.has(condition.id);
+                          return (
+                            <label key={condition.id} className="flex cursor-pointer items-start gap-2">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) => {
+                                  if (event.target.checked) {
+                                    updateSelectedConditions([...selectedConditionIds, condition.id]);
+                                  } else {
+                                    updateSelectedConditions(
+                                      selectedConditionIds.filter((id) => id !== condition.id),
+                                    );
+                                  }
+                                }}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-slate-700">
+                                {condition.label || `条件 ${conditionIndex + 1}`}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  複数選ぶと、選んだ条件すべてでこのステップを表示します。何も選ばない場合は共通ステップとして扱います。
+                </p>
+              </div>
+            )}
           </div>
         )}
 
