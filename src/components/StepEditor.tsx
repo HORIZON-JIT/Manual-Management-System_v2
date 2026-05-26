@@ -58,6 +58,7 @@ export default function StepEditor({
   const selectedConditionIds = getStepConditionIds(step);
   const selectedConditionSet = new Set(selectedConditionIds);
   const isConditionalStep = selectedConditionIds.length > 0;
+  const hasConditionGroups = (conditions?.length ?? 0) > 0;
   const selectedConditionLabels = (conditions ?? [])
     .filter((condition) => selectedConditionSet.has(condition.id))
     .map((condition) => condition.label)
@@ -454,8 +455,8 @@ export default function StepEditor({
           />
         </div>
 
-        <div>
-          <label className={labelClass}>次に進む先</label>
+        {hasConditionGroups && <div>
+          <label className={labelClass}>通常の次に進む先</label>
           <select
             value={nextStepSelectionValue}
             onChange={(e) => handleNextStepSelection(e.target.value)}
@@ -475,10 +476,19 @@ export default function StepEditor({
               })}
           </select>
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            自動判定を選ぶと並び順をもとに次のステップを決めます。終了を選ぶと、このステップでフローを終えます。
+            選択肢による分岐を使わない場合の進行先です。自動判定は並び順に沿って進み、終了はこのステップでフローを終えます。
             {isConditionalStep ? ' 条件付きステップでは、この設定を使って分岐後の合流先を明示できます。' : ''}
           </p>
-        </div>
+          {allSteps && allSteps.length > 1 && (
+            <button
+              type="button"
+              onClick={() => document.getElementById(`jump-settings-${step.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              className="mt-3 text-sm font-medium text-blue-700 transition hover:text-blue-900"
+            >
+              + 選択肢別の進み先を設定
+            </button>
+          )}
+        </div>}
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -590,8 +600,8 @@ export default function StepEditor({
           )}
         </div>
 
-        <div>
-          <label className={labelClass}>通常進行ラベル</label>
+        {hasConditionGroups && <div>
+          <label className={labelClass}>通常ルートの選択肢名（任意）</label>
           <input
             type="text"
             value={step.jumpDefaultLabel || ''}
@@ -599,10 +609,10 @@ export default function StepEditor({
               onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })
             }
             className={inputClass}
-            placeholder={step.endsBranch ? 'このステップを終了設定中は使用しません' : '例: OK、合格'}
+            placeholder={step.endsBranch ? 'このステップを終了設定中は使用しません' : '例: 問題なし、合格'}
             disabled={!!step.endsBranch}
           />
-        </div>
+        </div>}
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 p-4 md:col-span-2">
@@ -678,8 +688,8 @@ export default function StepEditor({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 p-4">
-            <p className="mb-3 text-sm font-semibold text-slate-800">条件付きジャンプ</p>
+          {hasConditionGroups && <div id={`jump-settings-${step.id}`} className="rounded-lg border border-slate-200 p-4">
+            <p className="mb-3 text-sm font-semibold text-slate-800">選択肢別の進み先</p>
             {allSteps && allSteps.length > 1 ? (
               <div className="space-y-2">
                 {(step.jumps ?? []).map((jump) => {
@@ -724,14 +734,14 @@ export default function StepEditor({
                       value={jumpLabel}
                       onChange={(e) => setJumpLabel(e.target.value)}
                       className={inputClass}
-                      placeholder="ラベル（例: NG、不合格）"
+                      placeholder="選択肢名（例: 不合格、やり直す）"
                     />
                     <select
                       value={jumpTargetId}
                       onChange={(e) => setJumpTargetId(e.target.value)}
                       className={inputClass}
                     >
-                      <option value="">ジャンプ先を選択...</option>
+                      <option value="">進み先を選択...</option>
                       {allSteps
                         .filter((item) => item.id !== step.id)
                         .map((item) => {
@@ -784,7 +794,7 @@ export default function StepEditor({
                     onClick={() => setShowJumpForm(true)}
                     className="text-sm font-medium text-blue-700 hover:text-blue-900"
                   >
-                    + ジャンプを追加
+                    + 進み先を追加
                   </button>
                 )}
               </div>
@@ -793,7 +803,7 @@ export default function StepEditor({
                 ステップが2件以上あると設定できます。
               </p>
             )}
-          </div>
+          </div>}
 
           <div className="rounded-lg border border-slate-200 p-4">
             <p className="mb-3 text-sm font-semibold text-slate-800">チェック項目</p>
