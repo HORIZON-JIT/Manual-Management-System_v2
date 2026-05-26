@@ -27,6 +27,8 @@ import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
 
+const DEFAULT_JUMP_VALUE = '__default__';
+
 function InstructionViewContent() {
   const searchParams = useSearchParams();
   const [instruction, setInstruction] = useState<WorkInstruction | null>(null);
@@ -36,6 +38,8 @@ function InstructionViewContent() {
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
+  const [selectedJumpTargets, setSelectedJumpTargets] = useState<Record<string, string>>({});
+  const [scrollTargetStepId, setScrollTargetStepId] = useState<string | null>(null);
   const [revealedCount, setRevealedCount] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
@@ -49,6 +53,10 @@ function InstructionViewContent() {
 
   useEffect(() => {
     setCheckStates({});
+    setSelectedConditions({});
+    setSelectedJumpTargets({});
+    setScrollTargetStepId(null);
+    setRevealedCount(1);
 
     if (window.location.hash) {
       const shared = parseShareData(window.location.hash);
@@ -104,6 +112,14 @@ function InstructionViewContent() {
     }
     setLoading(false);
   }, [searchParams, auth.isSignedIn]);
+
+  useEffect(() => {
+    if (!scrollTargetStepId) return;
+    const target = document.getElementById(`step-${scrollTargetStepId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setScrollTargetStepId(null);
+  }, [scrollTargetStepId, revealedCount, selectedJumpTargets]);
 
   const handlePrint = () => {
     window.print();
@@ -257,7 +273,9 @@ function InstructionViewContent() {
   const branchAnchorByStepId = new Map<string, string[]>();
   for (const groupId of groupOrder) {
     const branchStarts = (groupConditions.get(groupId) ?? [])
-      .map((condition) => getBranchFirstStep(condition.id))
+      .map((condition) =>
+        sortedSteps.find((step) => getStepConditionIds(step).includes(condition.id)) ?? null,
+      )
       .filter((step): step is Step => !!step);
 
     if (branchStarts.length === 0) continue;
@@ -266,8 +284,16 @@ function InstructionViewContent() {
       ...branchStarts.map((step) => stepIndex.get(step.id) ?? Number.MAX_SAFE_INTEGER),
     );
 
-    if (earliestIndex > 0) {
-      const anchorStep = sortedSteps[earliestIndex - 1];
+    const parentConditionId = groupMetaMap.get(groupId)?.parentConditionId;
+    const parentAnchorStep = parentConditionId
+      ? [...sortedSteps]
+          .slice(0, earliestIndex)
+          .reverse()
+          .find((step) => getStepConditionIds(step).includes(parentConditionId))
+      : undefined;
+    const anchorStep = parentAnchorStep ?? (earliestIndex > 0 ? sortedSteps[earliestIndex - 1] : null);
+
+    if (anchorStep) {
       const current = branchAnchorByStepId.get(anchorStep.id) ?? [];
       branchAnchorByStepId.set(anchorStep.id, [...current, groupId]);
     }
@@ -320,16 +346,26 @@ function InstructionViewContent() {
 
       if (current.endsBranch) break;
 
-      let nextStep = resolveBranchNextStep(current);
-      if (!nextStep && current.nextStepId && current.nextStepId !== current.id) {
-        const explicitTarget = stepById.get(current.nextStepId);
-        if (explicitTarget && stepMatchesSelection(explicitTarget)) {
-          nextStep = explicitTarget;
-        }
-      }
+      const jumpOptions = current.jumps ?? [];
+      const selectedJumpTarget: string | undefined = selectedJumpTargets[current.id];
+      if (jumpOptions.length > 0 && !selectedJumpTarget) break;
 
-      if (!nextStep) {
-        nextStep = resolveFallbackNextStep(current);
+      let nextStep: Step | null = null;
+      if (jumpOptions.length > 0 && selectedJumpTarget !== DEFAULT_JUMP_VALUE) {
+        nextStep = stepById.get(selectedJumpTarget) ?? null;
+        if (!nextStep) break;
+      } else {
+        nextStep = resolveBranchNextStep(current);
+        if (!nextStep && current.nextStepId && current.nextStepId !== current.id) {
+          const explicitTarget = stepById.get(current.nextStepId);
+          if (explicitTarget && stepMatchesSelection(explicitTarget)) {
+            nextStep = explicitTarget;
+          }
+        }
+
+        if (!nextStep) {
+          nextStep = resolveFallbackNextStep(current);
+        }
       }
 
       current = nextStep;
@@ -351,6 +387,31 @@ function InstructionViewContent() {
     }
     stepNumbers.push(logicalNumber);
   }
+
+  const handleConditionSelect = (groupId: string, conditionId: string, visibleIndex: number) => {
+    const activeConditionId = selectedConditions[groupId] ?? groupConditions.get(groupId)?.[0]?.id;
+    const branchChanged = activeConditionId !== conditionId;
+
+    setSelectedConditions((previous) => ({ ...previous, [groupId]: conditionId }));
+    if (isSequential && branchChanged) {
+      setRevealedCount((count) => Math.min(count, visibleIndex + 1));
+    }
+  };
+
+  const pendingJumpStepId =
+    visibleSteps.length > 0 &&
+    (visibleSteps[visibleSteps.length - 1].jumps?.length ?? 0) > 0 &&
+    !selectedJumpTargets[visibleSteps[visibleSteps.length - 1].id]
+      ? visibleSteps[visibleSteps.length - 1].id
+      : null;
+
+  const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
+    setSelectedJumpTargets((previous) => ({ ...previous, [stepId]: targetStepId }));
+    setScrollTargetStepId(targetStepId === DEFAULT_JUMP_VALUE ? null : targetStepId);
+    if (isSequential) {
+      setRevealedCount((count) => Math.max(count, visibleIndex + 2));
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -454,13 +515,17 @@ function InstructionViewContent() {
           const groupOptions = groupId ? groupConditions.get(groupId) ?? [] : [];
           const selectedGroupCondition = groupId ? (selectedConditions[groupId] ?? null) : null;
           const isLastRevealed = isSequential && index === Math.min(revealedCount, visibleSteps.length) - 1;
+          const awaitingJumpChoice = pendingJumpStepId === step.id;
 
           return (
             <Fragment key={step.id}>
               {showInlineTabs && groupId && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 no-print">
-                  <p className="text-xs text-slate-500 mb-2 font-medium">条件で表示を切り替え</p>
-                  <div className="flex gap-2 flex-wrap">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 no-print">
+                  <p className="text-sm font-semibold text-slate-800">条件を選択</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    該当する条件を選ぶと、その条件に沿った手順を表示します。
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {groupOptions.map((condition, conditionIndex) => {
                       const isActive =
                         selectedGroupCondition === condition.id ||
@@ -468,14 +533,11 @@ function InstructionViewContent() {
                       return (
                         <button
                           key={condition.id}
-                          onClick={() => {
-                            setSelectedConditions((prev) => ({ ...prev, [groupId]: condition.id }));
-                            setRevealedCount(1);
-                          }}
-                          className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                          onClick={() => handleConditionSelect(groupId, condition.id, index)}
+                          className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${
                             isActive
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                              ? 'border-slate-950 bg-slate-950 text-white'
+                              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
                           }`}
                         >
                           {condition.label}
@@ -486,7 +548,7 @@ function InstructionViewContent() {
                 </div>
               )}
 
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div id={`step-${step.id}`} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3.5 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <span className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-lg font-bold text-sm shrink-0 shadow-sm">
@@ -551,21 +613,54 @@ function InstructionViewContent() {
                   )}
 
                   {step.jumps && step.jumps.length > 0 && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 space-y-1.5">
-                      <p className="text-xs font-medium text-purple-700 mb-1">条件付きジャンプ</p>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+                      <p className="text-sm font-semibold text-slate-800">次の進行を選択</p>
+                      <p className="mt-1 text-xs text-slate-500">該当する内容を選ぶと、その先の手順を表示します。</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {step.jumps.map((jump) => {
                         const targetStep = sortedSteps.find((candidate) => candidate.id === jump.targetStepId);
-                        const targetIndex = sortedSteps.findIndex((candidate) => candidate.id === jump.targetStepId);
+                        const isSelected = selectedJumpTargets[step.id] === jump.targetStepId;
                         return (
-                          <p key={jump.id} className="text-sm text-purple-800">
-                            {jump.label} → ステップ {targetIndex >= 0 ? targetIndex + 1 : '?'}
-                            {targetStep ? `. ${targetStep.title}` : ''}
-                          </p>
+                          <button
+                            key={jump.id}
+                            type="button"
+                            onClick={() => handleJumpSelect(step.id, jump.targetStepId, index)}
+                            className={`rounded-lg border px-4 py-3 text-left transition ${
+                              isSelected
+                                ? 'border-slate-950 bg-slate-950 text-white'
+                                : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
+                            }`}
+                          >
+                            <span className="block text-sm font-semibold">{jump.label}</span>
+                            {targetStep && (
+                              <span className={`mt-1 block text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                                {targetStep.title}
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                       {step.jumpDefaultLabel && (
-                        <p className="text-sm text-purple-600">{step.jumpDefaultLabel} → 次のステップへ</p>
+                        <button
+                          type="button"
+                          onClick={() => handleJumpSelect(step.id, DEFAULT_JUMP_VALUE, index)}
+                          className={`rounded-lg border px-4 py-3 text-left transition ${
+                            selectedJumpTargets[step.id] === DEFAULT_JUMP_VALUE
+                              ? 'border-slate-950 bg-slate-950 text-white'
+                              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold">{step.jumpDefaultLabel}</span>
+                          <span
+                            className={`mt-1 block text-xs ${
+                              selectedJumpTargets[step.id] === DEFAULT_JUMP_VALUE ? 'text-slate-300' : 'text-slate-500'
+                            }`}
+                          >
+                            通常の次に進む先
+                          </span>
+                        </button>
                       )}
+                      </div>
                     </div>
                   )}
 
@@ -626,7 +721,11 @@ function InstructionViewContent() {
                   <span className="text-sm text-slate-500">
                     {stepNumbers[index]} / {stepNumbers[visibleSteps.length - 1]} ステップ
                   </span>
-                  {revealedCount < visibleSteps.length ? (
+                  {awaitingJumpChoice ? (
+                    <span className="px-4 py-2.5 text-sm font-medium text-slate-500">
+                      進行先を選択してください
+                    </span>
+                  ) : revealedCount < visibleSteps.length ? (
                     <button
                       onClick={() => setRevealedCount((count) => count + 1)}
                       className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
@@ -645,7 +744,7 @@ function InstructionViewContent() {
         })}
       </div>
 
-      {(!isSequential || revealedCount >= visibleSteps.length) && (
+      {(!isSequential || revealedCount >= visibleSteps.length) && !pendingJumpStepId && (
         <div className="text-center py-6">
           <p className="text-sm font-medium text-emerald-600">全ステップ完了</p>
         </div>

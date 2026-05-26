@@ -78,6 +78,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('none');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [showSidebarConditions, setShowSidebarConditions] = useState(false);
+  const [showSaveSettings, setShowSaveSettings] = useState(false);
   const [conditions, setConditions] = useState<Condition[]>(() => {
     const raw = initialData?.conditions ?? [];
     if (raw.length === 0) return [];
@@ -447,6 +449,164 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     return { groupOrder, grouped };
   })();
 
+  const renderConditionPanel = (compact: boolean, visibilityClass: string) => (
+    <section className={`${visibilityClass} rounded-lg border border-slate-200 bg-white p-5 shadow-sm`}>
+      <div
+        className={`flex gap-3 ${
+          compact ? 'items-start justify-between' : 'mb-4 flex-wrap items-center justify-between'
+        }`}
+      >
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">条件分岐</h2>
+          {(!compact || showSidebarConditions) && (
+            <p className="mt-1 text-sm text-slate-500">
+              条件ごとの手順をグループ単位で整理できます。
+            </p>
+          )}
+        </div>
+        {compact ? (
+          <button
+            type="button"
+            onClick={() => setShowSidebarConditions((shown) => !shown)}
+            aria-expanded={showSidebarConditions}
+            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            title={showSidebarConditions ? '折りたたむ' : '展開する'}
+          >
+            <svg
+              className={`h-4 w-4 transition ${showSidebarConditions ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={addGroup}
+            className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+          >
+            グループを追加
+          </button>
+        )}
+      </div>
+
+      {compact && !showSidebarConditions ? (
+        <p className="mt-2 text-xs text-slate-500">
+          {groupedConditions.groupOrder.length > 0
+            ? `${groupedConditions.groupOrder.length} グループを設定中`
+            : '未設定'}
+        </p>
+      ) : (
+        <div className={compact ? 'mt-4' : ''}>
+          {compact && (
+            <button
+              type="button"
+              onClick={addGroup}
+              className="mb-4 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+            >
+              グループを追加
+            </button>
+          )}
+          {groupedConditions.groupOrder.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+              条件分岐はまだ設定されていません。
+            </p>
+          ) : (
+            <div className={`space-y-3 ${compact ? 'max-h-64 overflow-y-auto pr-1' : ''}`}>
+          {groupedConditions.groupOrder.map((groupId, groupIndex) => {
+            const otherConditions = conditions.filter((condition) => condition.group !== groupId);
+            return (
+              <div
+                key={groupId}
+                className={`rounded-lg border border-blue-100 bg-blue-50/50 ${compact ? 'p-3' : 'p-4'}`}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-sm font-bold text-blue-800">
+                    グループ {String.fromCharCode(65 + groupIndex)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeGroup(groupId)}
+                    className="text-xs font-medium text-red-600 hover:text-red-800"
+                  >
+                    削除
+                  </button>
+                </div>
+
+                {otherConditions.length > 0 && (
+                  <div className="mb-3">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      親条件
+                    </label>
+                    <select
+                      value={groupParents[groupId] ?? ''}
+                      onChange={(event) =>
+                        setGroupParents((previous) => ({
+                          ...previous,
+                          [groupId]: event.target.value || undefined,
+                        }))
+                      }
+                      className={`${fieldClass} py-1.5 text-xs`}
+                    >
+                      <option value="">なし（単独で表示）</option>
+                      {otherConditions.map((condition) => (
+                        <option key={condition.id} value={condition.id}>
+                          {condition.label || '(未入力)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {groupedConditions.grouped.get(groupId)!.map((condition) => (
+                    <div key={condition.id} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={condition.label}
+                        onChange={(event) =>
+                          setConditions((previous) =>
+                            previous.map((current) =>
+                              current.id === condition.id
+                                ? { ...current, label: event.target.value }
+                                : current,
+                            ),
+                          )
+                        }
+                        className={`${fieldClass} min-w-0 py-2`}
+                        placeholder="例: Aの場合"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCondition(condition.id)}
+                        className="rounded-lg px-2 py-1 text-lg leading-none text-red-500 hover:bg-red-50"
+                        title="条件を削除"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => addConditionToGroup(groupId)}
+                  className="mt-3 text-sm font-medium text-blue-700 hover:text-blue-900"
+                >
+                  + 条件を追加
+                </button>
+              </div>
+            );
+          })}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+
   return (
     <>
       <form
@@ -468,7 +628,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           <LinkButton href="/" label="ホームへ戻る" />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="space-y-6">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-5">
@@ -627,117 +787,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               )}
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-950">条件分岐</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    条件ごとの手順をグループ単位で整理できます。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={addGroup}
-                  className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
-                >
-                  グループを追加
-                </button>
-              </div>
-
-              {groupedConditions.groupOrder.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
-                  条件分岐はまだ設定されていません。
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {groupedConditions.groupOrder.map((groupId, groupIndex) => {
-                    const otherConditions = conditions.filter((c) => c.group !== groupId);
-                    return (
-                      <div
-                        key={groupId}
-                        className="rounded-lg border border-blue-100 bg-blue-50/50 p-4"
-                      >
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <span className="text-sm font-bold text-blue-800">
-                            グループ {String.fromCharCode(65 + groupIndex)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeGroup(groupId)}
-                            className="text-xs font-medium text-red-600 hover:text-red-800"
-                          >
-                            グループ削除
-                          </button>
-                        </div>
-
-                        {otherConditions.length > 0 && (
-                          <div className="mb-3 flex items-center gap-2">
-                            <label className="shrink-0 text-xs font-medium text-slate-600">
-                              親条件
-                            </label>
-                            <select
-                              value={groupParents[groupId] ?? ''}
-                              onChange={(event) =>
-                                setGroupParents((prev) => ({
-                                  ...prev,
-                                  [groupId]: event.target.value || undefined,
-                                }))
-                              }
-                              className={`${fieldClass} py-1.5 text-xs`}
-                            >
-                              <option value="">なし（単独で表示）</option>
-                              {otherConditions.map((condition) => (
-                                <option key={condition.id} value={condition.id}>
-                                  {condition.label || '(未入力)'}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                          {groupedConditions.grouped.get(groupId)!.map((condition) => (
-                            <div key={condition.id} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={condition.label}
-                                onChange={(event) =>
-                                  setConditions((prev) =>
-                                    prev.map((c) =>
-                                      c.id === condition.id
-                                        ? { ...c, label: event.target.value }
-                                        : c,
-                                    ),
-                                  )
-                                }
-                                className={`${fieldClass} py-2`}
-                                placeholder="例: Aの場合"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeCondition(condition.id)}
-                                className="rounded-lg px-2 py-1 text-lg leading-none text-red-500 hover:bg-red-50"
-                                title="条件を削除"
-                              >
-                                &times;
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => addConditionToGroup(groupId)}
-                          className="mt-3 text-sm font-medium text-blue-700 hover:text-blue-900"
-                        >
-                          + 条件を追加
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+            {renderConditionPanel(false, 'lg:hidden')}
 
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -788,7 +838,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           </div>
 
           <aside className="h-fit space-y-4 lg:sticky lg:top-24">
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:hidden">
               <h2 className="text-base font-semibold text-slate-950">保存設定</h2>
 
               <label className="mt-4 flex cursor-pointer items-start gap-3">
@@ -810,42 +860,25 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
               <div className="mt-5 border-t border-slate-200 pt-4">
                 <p className="mb-2 text-sm font-semibold text-slate-700">Excel出力</p>
-                <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
-                  <input
-                    type="radio"
-                    name="excelNavMode"
-                    value="none"
-                    checked={excelNavMode === 'none'}
-                    onChange={() => setExcelNavMode('none')}
-                    className="accent-blue-600"
-                  />
-                  出力無し
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
-                  <input
-                    type="radio"
-                    name="excelNavMode"
-                    value="jump"
-                    checked={excelNavMode === 'jump'}
-                    onChange={() => setExcelNavMode('jump')}
-                    className="accent-blue-600"
-                  />
-                  ステップ別シート
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
-                  <input
-                    type="radio"
-                    name="excelNavMode"
-                    value="scroll"
-                    checked={excelNavMode === 'scroll'}
-                    onChange={() => setExcelNavMode('scroll')}
-                    className="accent-blue-600"
-                  />
-                  スクロール（従来通り）
-                </label>
+                {[
+                  { value: 'none', label: '出力無し' },
+                  { value: 'jump', label: 'ステップ別シート' },
+                  { value: 'scroll', label: 'スクロール（従来通り）' },
+                ].map((option) => (
+                  <label key={option.value} className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
+                    <input
+                      type="radio"
+                      name="excelNavMode"
+                      value={option.value}
+                      checked={excelNavMode === option.value}
+                      onChange={() => setExcelNavMode(option.value as ExcelNavMode)}
+                      className="accent-blue-600"
+                    />
+                    {option.label}
+                  </label>
+                ))}
               </div>
             </section>
-
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="space-y-3">
                 {draftSaveMessage && (
@@ -909,6 +942,92 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                 完成時は、指定した Google Drive フォルダに JSON を保存します。Excel出力を選んだ場合のみ、
                 スプレッドシートも保存します。
               </p>
+            </section>
+            {renderConditionPanel(true, 'hidden lg:block')}
+            <section className="hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:block">
+              <button
+                type="button"
+                onClick={() => setShowSaveSettings((shown) => !shown)}
+                aria-expanded={showSaveSettings}
+                className="flex w-full items-start justify-between gap-3 text-left"
+              >
+                <span>
+                  <span className="block text-base font-semibold text-slate-950">保存設定</span>
+                  {!showSaveSettings && (
+                    <span className="mt-2 block text-xs text-slate-500">
+                      Excel: {excelNavMode === 'none' ? '出力無し' : excelNavMode === 'jump' ? 'ステップ別シート' : 'スクロール'}
+                    </span>
+                  )}
+                </span>
+                <span className="rounded-lg border border-slate-200 p-2 text-slate-500">
+                  <svg
+                    className={`h-4 w-4 transition ${showSaveSettings ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {showSaveSettings && (
+                <>
+                  <label className="mt-4 flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={sequential}
+                      onChange={(event) => setSequential(event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-slate-700">
+                        読み飛ばし防止モード
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-500">
+                        閲覧時に「次へ」ボタンで1ステップずつ表示します。
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className="mt-5 border-t border-slate-200 pt-4">
+                    <p className="mb-2 text-sm font-semibold text-slate-700">Excel出力</p>
+                    <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
+                      <input
+                        type="radio"
+                        name="excelNavMode"
+                        value="none"
+                        checked={excelNavMode === 'none'}
+                        onChange={() => setExcelNavMode('none')}
+                        className="accent-blue-600"
+                      />
+                      出力無し
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
+                      <input
+                        type="radio"
+                        name="excelNavMode"
+                        value="jump"
+                        checked={excelNavMode === 'jump'}
+                        onChange={() => setExcelNavMode('jump')}
+                        className="accent-blue-600"
+                      />
+                      ステップ別シート
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
+                      <input
+                        type="radio"
+                        name="excelNavMode"
+                        value="scroll"
+                        checked={excelNavMode === 'scroll'}
+                        onChange={() => setExcelNavMode('scroll')}
+                        className="accent-blue-600"
+                      />
+                      スクロール（従来通り）
+                    </label>
+                  </div>
+                </>
+              )}
             </section>
           </aside>
         </div>
