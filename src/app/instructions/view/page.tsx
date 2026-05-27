@@ -40,9 +40,13 @@ function InstructionViewContent() {
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
   const [selectedJumpTargets, setSelectedJumpTargets] = useState<Record<string, string>>({});
   const [scrollTargetStepId, setScrollTargetStepId] = useState<string | null>(null);
+  const [chapterTargetStepId, setChapterTargetStepId] = useState<string | null>(null);
   const [revealedCount, setRevealedCount] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showChapters, setShowChapters] = useState(false);
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
 
@@ -52,10 +56,17 @@ function InstructionViewContent() {
   }, []);
 
   useEffect(() => {
+    const openSearch = () => setShowSearch(true);
+    window.addEventListener('open-instruction-search', openSearch);
+    return () => window.removeEventListener('open-instruction-search', openSearch);
+  }, []);
+
+  useEffect(() => {
     setCheckStates({});
     setSelectedConditions({});
     setSelectedJumpTargets({});
     setScrollTargetStepId(null);
+    setChapterTargetStepId(null);
     setRevealedCount(1);
 
     if (window.location.hash) {
@@ -117,7 +128,7 @@ function InstructionViewContent() {
     if (!scrollTargetStepId) return;
     const target = document.getElementById(`step-${scrollTargetStepId}`);
     if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setScrollTargetStepId(null);
   }, [scrollTargetStepId, revealedCount, selectedJumpTargets]);
 
@@ -406,6 +417,7 @@ function InstructionViewContent() {
       : null;
 
   const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
+    setChapterTargetStepId(null);
     setSelectedJumpTargets((previous) => ({ ...previous, [stepId]: targetStepId }));
     setScrollTargetStepId(targetStepId === DEFAULT_JUMP_VALUE ? null : targetStepId);
     if (isSequential) {
@@ -413,8 +425,53 @@ function InstructionViewContent() {
     }
   };
 
+  const routeSteps = isSequential ? visibleSteps.slice(0, revealedCount) : visibleSteps;
+  const chapterTargetStep = chapterTargetStepId ? stepById.get(chapterTargetStepId) : undefined;
+  const displayedSteps =
+    chapterTargetStep && !routeSteps.some((step) => step.id === chapterTargetStep.id)
+      ? [...routeSteps, chapterTargetStep]
+      : routeSteps;
+  const chapterStepNumbers = new Map(sortedSteps.map((step, index) => [step.id, index + 1]));
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  const searchResults = normalizedSearchQuery
+    ? sortedSteps.filter((step) => {
+        const searchText = [
+          step.title,
+          step.description,
+          step.caution,
+          ...(step.checkItems ?? []).map((item) => item.label),
+          ...(step.imageCaptions ?? []),
+          ...(step.links ?? []).map((link) => link.label),
+        ]
+          .filter(Boolean)
+          .join('\n')
+          .toLocaleLowerCase();
+        return searchText.includes(normalizedSearchQuery);
+      })
+    : [];
+
+  const scrollToStep = (step: Step) => {
+    const targetConditions = getStepConditionIds(step);
+    if (targetConditions.length > 0) {
+      setSelectedConditions((previous) => {
+        const next = { ...previous };
+        for (const conditionId of targetConditions) {
+          const groupId = condGroupMap.get(conditionId);
+          if (groupId) next[groupId] = conditionId;
+        }
+        return next;
+      });
+    }
+    setSelectedJumpTargets({});
+    setRevealedCount(sortedSteps.length);
+    setChapterTargetStepId(step.id);
+    setScrollTargetStepId(step.id);
+    setShowChapters(false);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="mx-auto grid max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[16rem_minmax(0,56rem)]">
+      <main className="min-w-0 w-full max-w-4xl">
       <div className="flex flex-wrap items-center gap-2 mb-6 no-print">
         <div className="flex-1" />
         {appViewUrl && (
@@ -507,7 +564,7 @@ function InstructionViewContent() {
       </div>
 
       <div className="space-y-4">
-        {(isSequential ? visibleSteps.slice(0, revealedCount) : visibleSteps).map((step, index) => {
+        {displayedSteps.map((step, index) => {
           const previousStep = index > 0 ? visibleSteps[index - 1] : null;
           const groupId = getPrimaryStepGroup(step);
           const previousGroupId = previousStep ? getPrimaryStepGroup(previousStep) : undefined;
@@ -551,7 +608,7 @@ function InstructionViewContent() {
               <div id={`step-${step.id}`} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3.5 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-lg font-bold text-sm shrink-0 shadow-sm">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-950 text-sm font-bold text-white shadow-sm shrink-0">
                       {stepNumbers[index]}
                     </span>
                     <h2 className="font-semibold text-slate-800 flex-1">{step.title}</h2>
@@ -767,6 +824,109 @@ function InstructionViewContent() {
       {showFlowchart && (
         <FlowchartModal instruction={instruction} onClose={() => setShowFlowchart(false)} />
       )}
+      {showSearch && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-neutral-950/35 px-4 pt-24 no-print">
+          <section className="w-full max-w-xl rounded-lg border border-neutral-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">手順書内を検索</h2>
+                <p className="mt-1 text-xs text-slate-500">分岐に関係なく、全ステップを検索します。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearch(false)}
+                className="rounded-md p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="検索を閉じる"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-5">
+              <input
+                autoFocus
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="検索する単語を入力"
+                className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              />
+              <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+                {normalizedSearchQuery && searchResults.length === 0 && (
+                  <p className="rounded-md bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+                    該当するステップがありません。
+                  </p>
+                )}
+                {searchResults.map((step) => (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => {
+                      scrollToStep(step);
+                      setShowSearch(false);
+                    }}
+                    className="flex w-full items-start gap-3 rounded-md border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
+                      {chapterStepNumbers.get(step.id)}
+                    </span>
+                    <span className="text-sm font-semibold text-slate-800">{step.title || '未入力のステップ'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+      </main>
+
+      <aside className="order-first no-print hidden lg:block">
+        {showChapters ? (
+        <nav className="sticky top-24 w-64 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Chapter</p>
+              <h2 className="mt-2 text-base font-semibold text-slate-900">ステップ一覧</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowChapters(false)}
+              className="rounded-md p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              aria-label="ステップ一覧を閉じる"
+            >
+              &times;
+            </button>
+          </div>
+          <div className="mt-4 max-h-[calc(100vh-13rem)] space-y-1 overflow-y-auto pr-1">
+            {sortedSteps.map((step) => (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => scrollToStep(step)}
+                className="group flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-slate-50"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600 transition group-hover:bg-slate-950 group-hover:text-white">
+                  {chapterStepNumbers.get(step.id)}
+                </span>
+                <span className="pt-0.5 text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-950">
+                  {step.title || '未入力のステップ'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </nav>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowChapters(true)}
+            className="sticky top-24 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_12px_32px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            目次
+          </button>
+        )}
+      </aside>
     </div>
   );
 }

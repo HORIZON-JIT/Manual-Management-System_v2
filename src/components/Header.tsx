@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
@@ -9,6 +10,7 @@ import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 
 export default function Header() {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -26,6 +28,7 @@ export default function Header() {
   const handleFolderSelected = (folder: DriveFolder | null) => {
     setCurrentFolder(folder ?? getTargetFolder());
   };
+  const isInstructionView = pathname.includes('/instructions/view');
 
   return (
     <>
@@ -39,6 +42,19 @@ export default function Header() {
           </Link>
 
           <nav className="hidden items-center gap-1.5 md:flex">
+            {isInstructionView && (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('open-instruction-search'))}
+                className="mr-2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 shadow-[0_6px_16px_rgba(0,0,0,0.04)] transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-950"
+                aria-label="手順書内を検索"
+                title="手順書内を検索"
+              >
+                <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
+                </svg>
+              </button>
+            )}
             <button
               onClick={() => setShowHelp(true)}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
@@ -49,18 +65,6 @@ export default function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
-            <Link
-              href="/"
-              className="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
-            >
-              ホーム
-            </Link>
-            <Link
-              href="/instructions/new"
-              className="rounded-md bg-neutral-950 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] transition hover:bg-neutral-800"
-            >
-              新規作成
-            </Link>
             <div className="ml-3 border-l border-neutral-200 pl-3">
               <GoogleSignInButton />
             </div>
@@ -99,12 +103,6 @@ export default function Header() {
             >
               使い方
             </button>
-            <Link href="/" className="block rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100" onClick={() => setMenuOpen(false)}>
-              ホーム
-            </Link>
-            <Link href="/instructions/new" className="block rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100" onClick={() => setMenuOpen(false)}>
-              新規作成
-            </Link>
             <div className="px-3 py-2">
               <GoogleSignInButton />
             </div>
