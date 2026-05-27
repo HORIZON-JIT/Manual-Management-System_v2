@@ -78,6 +78,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('none');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [showStepIndex, setShowStepIndex] = useState(false);
   const [showSidebarConditions, setShowSidebarConditions] = useState(false);
   const [showSaveSettings, setShowSaveSettings] = useState(false);
   const [conditions, setConditions] = useState<Condition[]>(() => {
@@ -139,6 +140,14 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     const newSteps = [...steps];
     newSteps[index] = updatedStep;
     setSteps(newSteps);
+  };
+
+  const scrollToEditStep = (stepId: string) => {
+    document.getElementById(`edit-step-${stepId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+    setShowStepIndex(false);
   };
 
   const handleRemoveStep = (index: number) => {
@@ -341,20 +350,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     } else {
       router.push('/instructions/drafts');
     }
-  };
-
-  const handleJsonExport = () => {
-    const instruction = buildInstruction('draft');
-    if (!instruction) return;
-
-    const json = JSON.stringify(instruction, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${instruction.title || '手順書'}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
   };
 
   const saveToFolder = async (instruction: WorkInstruction) => {
@@ -804,17 +799,19 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
               {steps.map((step, index) => (
                 <Fragment key={step.id}>
-                  <StepEditor
-                    step={step}
-                    index={index}
-                    totalSteps={steps.length}
-                    conditions={conditions}
-                    allSteps={steps}
-                    onChange={(updatedStep) => handleStepChange(index, updatedStep)}
-                    onRemove={() => handleRemoveStep(index)}
-                    onMoveUp={() => handleMoveStep(index, 'up')}
-                    onMoveDown={() => handleMoveStep(index, 'down')}
-                  />
+                  <div id={`edit-step-${step.id}`} className="scroll-mt-24">
+                    <StepEditor
+                      step={step}
+                      index={index}
+                      totalSteps={steps.length}
+                      conditions={conditions}
+                      allSteps={steps}
+                      onChange={(updatedStep) => handleStepChange(index, updatedStep)}
+                      onRemove={() => handleRemoveStep(index)}
+                      onMoveUp={() => handleMoveStep(index, 'up')}
+                      onMoveDown={() => handleMoveStep(index, 'down')}
+                    />
+                  </div>
                   {index < steps.length - 1 && (
                     <button
                       type="button"
@@ -868,7 +865,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                   <label key={option.value} className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
                     <input
                       type="radio"
-                      name="excelNavMode"
+                      name="excelNavMode-mobile"
                       value={option.value}
                       checked={excelNavMode === option.value}
                       onChange={() => setExcelNavMode(option.value as ExcelNavMode)}
@@ -917,20 +914,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                   className="w-full rounded-lg bg-slate-950 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving ? '保存中...' : '完成してDriveへ保存'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleJsonExport}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
-                >
-                  JSONで保存
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="w-full px-4 py-2 text-sm text-slate-500 transition hover:text-slate-800"
-                >
-                  キャンセル
                 </button>
                 {saveMessage && (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -995,7 +978,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
                       <input
                         type="radio"
-                        name="excelNavMode"
+                        name="excelNavMode-desktop"
                         value="none"
                         checked={excelNavMode === 'none'}
                         onChange={() => setExcelNavMode('none')}
@@ -1006,7 +989,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
                       <input
                         type="radio"
-                        name="excelNavMode"
+                        name="excelNavMode-desktop"
                         value="jump"
                         checked={excelNavMode === 'jump'}
                         onChange={() => setExcelNavMode('jump')}
@@ -1017,7 +1000,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     <label className="flex cursor-pointer items-center gap-2 py-1 text-sm text-slate-600">
                       <input
                         type="radio"
-                        name="excelNavMode"
+                        name="excelNavMode-desktop"
                         value="scroll"
                         checked={excelNavMode === 'scroll'}
                         onChange={() => setExcelNavMode('scroll')}
@@ -1032,6 +1015,92 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           </aside>
         </div>
       </form>
+
+      <div className="fixed left-6 top-24 z-30 hidden xl:block">
+        {showStepIndex ? (
+          <nav className="w-60 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Chapter</p>
+                <h2 className="mt-2 text-base font-semibold text-slate-900">ステップ一覧</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStepIndex(false)}
+                className="text-slate-400 transition hover:text-slate-700"
+                aria-label="目次を閉じる"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[calc(100vh-12rem)] space-y-1 overflow-y-auto pr-1">
+              {steps.map((step, index) => (
+                <button
+                  type="button"
+                  key={step.id}
+                  onClick={() => scrollToEditStep(step.id)}
+                  className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-600">
+                    {index + 1}
+                  </span>
+                  <span className="pt-0.5 leading-5">{step.title.trim() || '(タイトル未入力)'}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowStepIndex(true)}
+            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_12px_32px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            目次
+          </button>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowStepIndex(true)}
+        className="fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg xl:hidden"
+      >
+        <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        目次
+      </button>
+
+      {showStepIndex && (
+        <div className="fixed inset-0 z-40 flex items-end bg-slate-950/25 p-4 xl:hidden">
+          <nav className="w-full rounded-lg bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">ステップ一覧</h2>
+              <button type="button" onClick={() => setShowStepIndex(false)} className="px-2 py-1 text-slate-500">
+                閉じる
+              </button>
+            </div>
+            <div className="max-h-[55vh] space-y-1 overflow-y-auto">
+              {steps.map((step, index) => (
+                <button
+                  type="button"
+                  key={step.id}
+                  onClick={() => scrollToEditStep(step.id)}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold">{index + 1}</span>
+                  {step.title.trim() || '(タイトル未入力)'}
+                </button>
+              ))}
+            </div>
+          </nav>
+        </div>
+      )}
 
       {saveSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
