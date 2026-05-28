@@ -79,6 +79,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showStepIndex, setShowStepIndex] = useState(false);
+  const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
   const [showSidebarConditions, setShowSidebarConditions] = useState(false);
   const [showSaveSettings, setShowSaveSettings] = useState(false);
   const [conditions, setConditions] = useState<Condition[]>(() => {
@@ -653,7 +654,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     カテゴリ <span className="text-red-500">*</span>
                   </label>
                   {showCustomCategory ? (
-                    <div className="flex gap-2">
+                    <div>
                       <input
                         type="text"
                         value={customCategory}
@@ -661,7 +662,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                           setCustomCategory(event.target.value);
                           setCategory(event.target.value);
                         }}
-                        className={fieldClass}
+                        className={`${fieldClass} h-12`}
                         placeholder="カテゴリ名を入力"
                         autoFocus
                       />
@@ -672,17 +673,17 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                           setCustomCategory('');
                           setCategory(DEFAULT_CATEGORIES[0]);
                         }}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                        className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-950"
                       >
-                        戻す
+                        既存カテゴリに戻す
                       </button>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
+                    <div>
                       <select
                         value={category}
                         onChange={(event) => setCategory(event.target.value)}
-                        className={fieldClass}
+                        className={`${fieldClass} h-12`}
                       >
                         {DEFAULT_CATEGORIES.map((cat) => (
                           <option key={cat} value={cat}>
@@ -693,9 +694,9 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                       <button
                         type="button"
                         onClick={() => setShowCustomCategory(true)}
-                        className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                        className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-950"
                       >
-                        追加
+                        + カテゴリを追加
                       </button>
                     </div>
                   )}
@@ -709,19 +710,45 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     type="text"
                     value={authorName}
                     onChange={(event) => setAuthorName(event.target.value)}
-                    className={fieldClass}
+                    className={`${fieldClass} h-12`}
                     placeholder={isEdit ? '更新者の名前を入力' : '作成者の名前を入力'}
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className={labelClass}>概要</label>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <label className="block text-sm font-semibold text-slate-700">概要</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowDescriptionGuide((current) => !current)}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                      aria-expanded={showDescriptionGuide}
+                      aria-label="概要欄の説明を表示"
+                      title="概要欄の説明"
+                    >
+                      ?
+                    </button>
+                  </div>
+                  {showDescriptionGuide && (
+                    <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+                      <p className="font-semibold text-slate-900">
+                        「なんのためにこの作業を行うのか、作業の意味と目的」の概要を記載してください。
+                      </p>
+                      <p className="mt-2 text-slate-600">
+                        ※例.オーダーリリース
+                        <br />
+                        確定した計画に基づき、現場や部品出庫へ正しい製造指示を毎朝タイムリーに発行するためです。
+                        <br />
+                        事前に異常のあるオーダーを検知・周知することで、現場の誤着手や不要な部品出庫といった混乱を防ぐ役割もあります。
+                      </p>
+                    </div>
+                  )}
                   <textarea
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     rows={3}
                     className={`${fieldClass} resize-y`}
-                    placeholder="この手順書の目的や対象作業を入力してください"
+                    placeholder="「なんのためにこの作業を行うのか、作業の意味と目的」の概要を記載してください。"
                   />
                 </div>
 
