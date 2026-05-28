@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WorkInstruction } from '@/types/instruction';
-import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
+import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import { setTempData } from '@/lib/tempStorage';
@@ -32,6 +32,7 @@ const actions = [
 export default function HomePage() {
   const router = useRouter();
   const [importError, setImportError] = useState<string | null>(null);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [version, setVersion] = useState('');
@@ -56,7 +57,11 @@ export default function HomePage() {
 
   const ensureDriveReady = () => {
     const auth = getAuthState();
-    if (isGoogleConfigured() && auth.isSignedIn) return true;
+    if (isGoogleConfigured() && auth.isSignedIn) {
+      setShowAuthPrompt(false);
+      return true;
+    }
+    setShowAuthPrompt(true);
     setImportError(
       'Google Drive に接続してください。右上のサインインボタンからログインできます。',
     );
@@ -171,7 +176,45 @@ export default function HomePage() {
         </button>
       </section>
 
-      {importError && (
+      {showAuthPrompt && (
+        <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-neutral-950">Google Drive にログインしてください</p>
+              <p className="mt-1 text-sm leading-6 text-neutral-500">
+                Drive上の手順書を編集・表示するには、先にGoogleアカウントの認証が必要です。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={signIn}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-neutral-950 px-5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition hover:bg-neutral-800"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+              Googleでログイン
+            </button>
+          </div>
+        </section>
+      )}
+
+      {importError && !showAuthPrompt && (
         <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {importError}
         </div>
